@@ -43,8 +43,50 @@ async function main(){
     console.log("Owner of intentMaching: ", ownerAddress);
 
     //Create Buy Intent first
-    
-    
+    const buyAmount = 100n * 10n ** 18n;
+    const minAmountInBuy = 200n * 10n ** 18n;
+    await tokenAInstance.connect(user1).approve(intentMachingAddress, buyAmount);
+
+    await intentMatching.connect(user1).createBuyIntent(
+        tokenAAddress, 
+        tokenBAddress,
+        buyAmount,
+        minAmountInBuy,
+        Math.floor(Date.now() / 1000) + 3600
+    )
+    console.log("Buy Intent: 100 TTA → min 200 TTB");
+    const buyIntent = await intentMatching.getBuyIntent(0);
+    console.log("Buy Intent Details:", {
+        user: buyIntent.user,
+        tokenIn: buyIntent.tokenIn,
+        tokenOut: buyIntent.tokenOut,
+        amountIn: ethers.formatEther(buyIntent.amountIn),
+        minAmountOut: ethers.formatEther(buyIntent.minAmountOut),
+        status: ["Pending", "Filled", "Cancelled"][buyIntent.status]
+    });
+
+    //Create sell intent second
+    const sellAmount = 200n * 10n ** 18n;
+    const minAmountInSell = 100n * 10n ** 18n;
+    await tokenBInstance.connect(user2).approve(intentMachingAddress, sellAmount);
+
+    await intentMatching.connect(user2).createSellIntent(
+        tokenBAddress, 
+        tokenAAddress,
+        sellAmount,
+        minAmountInSell,
+        Math.floor(Date.now() / 1000) + 3600
+    )
+    console.log("Sell Intent: 200 TTB → min 100 TTA");
+    const sellIntent = await intentMatching.getSellIntent(0);
+    console.log("Sell Intent Details:", {
+        user: sellIntent.user,
+        tokenIn: sellIntent.tokenIn,
+        tokenOut: sellIntent.tokenOut,
+        amountIn: ethers.formatEther(sellIntent.amountIn),
+        minAmountOut: ethers.formatEther(sellIntent.minAmountOut),
+        status: ["Pending", "Filled", "Cancelled"][sellIntent.status]
+    });
     
 }
 main().catch(error => {
