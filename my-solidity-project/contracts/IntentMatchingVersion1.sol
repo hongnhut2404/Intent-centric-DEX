@@ -95,4 +95,12 @@ contract IntentMatchingVersion1 is Ownable, ReentrancyGuard{
         emit SellIntentCreated(intentId, msg.sender, address(tokenIn), address(tokenOut), amountIn, minAmountOut, deadline);
         return intentId;
     }
+
+    function getBuyIntent(uint256 intentId) external view returns (BuyIntent memory){
+        return buyIntents[intentId];
+    }
+
+    function getSellIntent(uint256 intentId) external view returns (SellIntent memory){
+        return sellIntents[intentId];
+    }
 }
