@@ -12,6 +12,12 @@ const main = async() => {
     
     const tokenAAddress = await tokenAInstance.getAddress();
     console.log("Address of token A: ", tokenAAddress);
+
+    const balanceRaw = await tokenAInstance.balanceOf(owner.address);  
+    const decimals = 18;
+    const balanceTokens = ethers.formatUnits(balanceRaw, decimals); 
+    console.log("Owner balance:", balanceTokens); 
+    // console.log("Balance: ", await tokenAInstance.balanceOf(tokenAAddress));
 }
 
 main().catch((e) => {
