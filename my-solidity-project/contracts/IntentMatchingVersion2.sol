@@ -44,6 +44,63 @@ contract IntentMatchingVersion2 is Ownable, ReentrancyGuard{
     event TradeExecuted(uint256 indexed buyIntentId,uint256 indexed sellIntentId,address indexed executor,address tokenIn,address tokenOut,uint256 amountIn,uint256 amountOut);
     event IntentCancelled(uint256 indexed intentId, bool isBuyIntent);
 
-    
+    function createBuyIntent(
+        IERC20 tokenIn, 
+        IERC20 tokenOut, 
+        uint256 amountIn, 
+        uint256 minAmountOut, 
+        uint256 deadline) 
+        external returns (uint256){
+
+        require(amountIn > 0, "Amount must be positive");
+        require(deadline > block.timestamp, "Deadline must be in the future");
+
+        uint256 intentId = intentCountBuy++;
+        buyIntents[intentId] = BuyIntent({
+            user: msg.sender,
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: amountIn,
+            minAmountOut: minAmountOut,
+            deadline: deadline,
+            status: IntentStatus.Pending
+        });
+
+        emit BuyIntentCreated(intentId, msg.sender, address(tokenIn), address(tokenOut), amountIn, minAmountOut, deadline);
+        return intentId;
+    }
+
+    function createSellIntent(
+        IERC20 tokenIn,
+        IERC20 tokenOut,
+        uint256 amountIn,
+        uint256 minAmountOut,
+        uint256 deadline
+    ) external returns (uint256){
+        require(amountIn > 0, "Amount must be positive");
+        require(deadline > block.timestamp, "Deadline must be in the future");
+
+        uint256 intentId = intentCountSell++;
+        sellIntents[intentId] = SellIntent({
+            user: msg.sender,
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            amountIn: amountIn,
+            minAmountOut: minAmountOut,
+            deadline: deadline,
+            status: IntentStatus.Pending
+        });
+
+        emit SellIntentCreated(intentId, msg.sender, address(tokenIn), address(tokenOut), amountIn, minAmountOut, deadline);
+        return intentId;
+    }
+
+    function getBuyIntent(uint256 intentId) external view returns (BuyIntent memory){
+        return buyIntents[intentId];
+    }
+
+    function getSellIntent(uint256 intentId) external view returns (SellIntent memory){
+        return sellIntents[intentId];
+    }
      
 }
