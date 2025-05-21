@@ -87,7 +87,39 @@ async function main(){
         minAmountOut: ethers.formatEther(sellIntent.minAmountOut),
         status: ["Pending", "Filled", "Cancelled"][sellIntent.status]
     });
-    
+
+    //Distribute tokens: TokenA -> User1, TokenB -> User2
+    console.log("\nDistributing test tokens...");
+    const distributeAmount = 500n * 10n ** 18n;
+
+    await tokenAInstance.transfer(user1.address, distributeAmount);
+    await tokenBInstance.transfer(user2.address, distributeAmount);
+
+    console.log(`Sent ${ethers.formatEther(distributeAmount)} TokenA to User1`);
+    console.log(`Sent ${ethers.formatEther(distributeAmount)} TokenB to User2`);
+
+    //Before match
+    console.log("\nPre-Match Balances:");
+    console.log("User1 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user1.address)));
+    console.log("User1 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user1.address)));
+    console.log("User2 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user2.address)));
+    console.log("User2 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user2.address)));
+
+    console.log("\nMatching intents...");
+    const matchTx = await intentMatching.matchIntent(
+        0, // buyIntentId
+        0, // sellIntentId
+        sellAmount // 200 TTB
+    );
+    await matchTx.wait();
+    console.log("Intents matched successfully!");
+
+    //After match
+    console.log("\nAfter-Match Balances:");
+    console.log("User1 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user1.address)));
+    console.log("User1 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user1.address)));
+    console.log("User2 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user2.address)));
+    console.log("User2 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user2.address)));
 }
 main().catch(error => {
     console.error("Error:", error.message);

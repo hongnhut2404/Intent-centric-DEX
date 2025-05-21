@@ -96,6 +96,56 @@ contract IntentMatchingVersion1 is Ownable, ReentrancyGuard{
         return intentId;
     }
 
+    function matchIntent(uint256 buyIntentId, uint256 sellIntentId, uint256 amountOut) external nonReentrant{
+        BuyIntent storage buy = buyIntents[buyIntentId];
+        SellIntent storage sell = sellIntents[sellIntentId];
+
+        console.log("Buy TokenIn: ", address(buy.tokenIn));
+        console.log("Sell TokenOut: ", address(sell.tokenOut));
+        console.log("Buy TokenOut: ", address(buy.tokenOut));
+        console.log("Sell TokenIn", address(sell.tokenIn));
+
+        //validate token pair
+        require(buy.tokenIn == sell.tokenOut, "Token Mismatch");
+        require(buy.tokenOut == sell.tokenIn, "Token Mismatch");
+
+        //Rate
+        uint256 buyerEffectivePrice = (buy.amountIn * 1e18) / buy.minAmountOut;
+        uint256 sellerEffectivePrice = (sell.minAmountOut * 1e18) / sell.amountIn;
+        require(buyerEffectivePrice >= sellerEffectivePrice, "Price incompatible");
+
+        // Validate price 
+        require(buyerEffectivePrice >= sellerEffectivePrice, "Price incompatible");
+        
+        // Calculate maximum possible trade
+        uint256 maxPossibleAmountOut = Math.min(
+            buy.minAmountOut,
+            sell.amountIn
+        );
+        require(amountOut <= maxPossibleAmountOut, "Amount too large");
+        
+        // Calculate required input
+        uint256 requiredAmountIn = (amountOut * buy.amountIn) / buy.minAmountOut;
+        
+        // Execute transfers
+        buy.tokenIn.transferFrom(buy.user, sell.user, requiredAmountIn);
+        sell.tokenIn.transferFrom(sell.user, buy.user, amountOut);
+        
+        // Update intent statuses
+        buy.status = IntentStatus.Filled;
+        sell.status = IntentStatus.Filled;
+        
+        emit TradeExecuted(
+            buyIntentId,
+            sellIntentId,
+            msg.sender,
+            address(buy.tokenIn),
+            address(buy.tokenOut),
+            requiredAmountIn,
+            amountOut
+        );
+    }
+
     function getBuyIntent(uint256 intentId) external view returns (BuyIntent memory){
         return buyIntents[intentId];
     }
