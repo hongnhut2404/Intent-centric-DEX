@@ -1,13 +1,4 @@
-# Sample Hardhat Project
-
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
-
-Try running some of the following tasks:
-
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat ignition deploy ./ignition/modules/Lock.js
-```
+Contract Addresses:
+TokenA: 0x9bc0897FBA66ca6A520c851568eedC8B54B3d27B
+TokenB: 0x6B564dA8EfC9748988BD8E2786D22c25cEfc8C8E
+IntentMatching: 0xDafFDF27B17CEE16873Ee9bAE2154a1E4Ea709D6
