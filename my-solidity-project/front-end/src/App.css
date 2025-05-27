@@ -1,8 +1,17 @@
+:root {
+  --primary-color: #df7758;
+  --bg-color: #171b29;
+  --light-bg: #2a2f45;
+  --text-light: #ccc;
+  --text-muted: #888;
+}
+
 .dex-app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f5f5;
+  background-color: var(--bg-color);
+  color: var(--text-light);
 }
 
 .dex-main {

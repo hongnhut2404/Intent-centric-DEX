@@ -1,68 +1,78 @@
 .dex-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    background-color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-  
-  .dex-logo {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #6200ee;
-  }
-  
-  .dex-nav {
-    display: flex;
-    gap: 1.5rem;
-  }
-  
-  .dex-nav-link {
-    color: #333;
-    text-decoration: none;
-    font-weight: 500;
-    padding: 0.5rem;
-    border-radius: 4px;
-  }
-  
-  .dex-nav-link:hover {
-    background-color: #f0f0f0;
-  }
-  
-  .dex-nav-link.active {
-    color: #6200ee;
-  }
-  
-  .dex-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-  
-  .dex-connect-button {
-    background-color: #6200ee;
-    color: white;
-    border: none;
-    padding: 0.5rem 1.5rem;
-    border-radius: 4px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  
-  .dex-connect-button:hover {
-    background-color: #7c4dff;
-  }
-  
-  .dex-menu-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-  }
-  
-  .dex-menu-button svg {
-    fill: #333;
-    width: 24px;
-    height: 24px;
-  }
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--bg-color);
+  color: var(--text-light);
+  border-bottom: 1px solid var(--light-bg);
+}
+
+.dex-logo-img {
+  height: 32px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.dex-logo {
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #df7758; /* primary color */
+}
+
+.dex-nav {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.dex-nav-link {
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.dex-nav-link:hover {
+  background-color: #f0f0f0;
+}
+
+.dex-nav-link.active {
+  color: #6200ee;
+}
+
+.dex-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dex-connect-button {
+  background-color: #6200ee;
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: var(--primary-color);
+}
+
+.dex-connect-button:hover {
+  background-color: #e78866;
+}
+
+.dex-menu-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+.dex-menu-button svg {
+  fill: #333;
+  width: 24px;
+  height: 24px;
+}

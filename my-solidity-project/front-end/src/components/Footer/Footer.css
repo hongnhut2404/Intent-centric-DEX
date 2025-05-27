@@ -1,20 +1,20 @@
 .dex-footer {
-    padding: 1rem 2rem;
-    background-color: white;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .dex-price-info {
-    display: flex;
-    gap: 1rem;
-    color: #666;
-    font-size: 0.9rem;
-  }
-  
-  .dex-copyright {
-    color: #666;
-    font-size: 0.8rem;
-  }
+  padding: 1rem 2rem;
+  background-color: white;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dex-price-info {
+  display: flex;
+  gap: 1rem;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.dex-copyright {
+  color: #666;
+  font-size: 0.8rem;
+}

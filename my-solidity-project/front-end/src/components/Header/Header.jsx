@@ -1,9 +1,13 @@
 import './Header.css';
+import logo from '../../assets/logo.png'; 
 
 export default function Header({ connected, setConnected }) {
   return (
     <header className="dex-header">
-      <div className="dex-logo">IntentSwap</div>
+      <div className="dex-logo">
+        <img src={logo} alt="IntentSwap Logo" className="dex-logo-img" />
+        IntentSwap
+      </div>
       
       <nav className="dex-nav">
         <a href="#" className="dex-nav-link active">Swap</a>
