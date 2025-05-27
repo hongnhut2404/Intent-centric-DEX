@@ -59,6 +59,8 @@
   font-weight: 500;
   cursor: pointer;
   background-color: var(--primary-color);
+  width: 120px;       
+  height: 40px;       
 }
 
 .dex-connect-button:hover {

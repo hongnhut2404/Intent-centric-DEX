@@ -53,7 +53,7 @@ export default function SwapCard() {
 
       <div className="dex-rate-info">
         1 ETH = 3,110.44 DAL ($3,106.74)
-        <div className="dex-rate-fee">$0.10</div>
+        <div className="dex-rate-fee">$0.10: Fee</div>
       </div>
     </div>
   );
