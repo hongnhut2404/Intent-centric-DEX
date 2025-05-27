@@ -49,7 +49,7 @@ export default function SwapCard() {
         <p className="dex-balance-text">Balance: 0 DAL</p>
       </div>
 
-      <button className="dex-swap-button">SWAP</button>
+      <button className="dex-swap-button">Submit Intent</button>
 
       <div className="dex-rate-info">
         1 ETH = 3,110.44 DAL ($3,106.74)
