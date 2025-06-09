@@ -15,4 +15,4 @@ npx hardhat compile
 
 #At my-solidity-project, run test file
 
-npx hardhat deploy deploy/MatchingVersion2.js
+npx hardhat run deploy/MatchingVersion2.js
