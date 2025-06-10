@@ -15,7 +15,7 @@ npx hardhat node
 Alice deploys the HTLC contract and retrieves the address.
 
 ```bash
-npx hardhat run scripts/deployHTLC.js --network localhost
+npx hardhat run localhost-script/deployHTLC.js --network localhost
 # Output: HTLC contract address
 ```
 
@@ -23,7 +23,7 @@ npx hardhat run scripts/deployHTLC.js --network localhost
 Alice creates the HTLC on-chain.
 
 ```bash
-npx hardhat run scripts/createHTLC.js --network localhost
+npx hardhat run localhost-script/createHTLC.js --network localhost
 # Input: htlcAddress, recipient address, timelock
 # Output: secret (preimage), hash(secret) (sha256)
 ```
@@ -94,7 +94,7 @@ Once Alice redeems BTC, the `secret` becomes public on the blockchain.
 Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
 
 ```bash
-npx hardhat run scripts/withdrawHTLC.js --network localhost
+npx hardhat run localhost-script/withdrawHTLC.js --network localhost
 # Update withdrawHTLC.js script
 # Input: lockID, secret (preimage), htlcAddress, recipient address
 ```
