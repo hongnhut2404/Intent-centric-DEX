@@ -3,6 +3,8 @@
 ## Implement package
 go get github.com/joho/godotenv
 
+dnf install tmux
+
 
 ## Step 0.1: Setup Localhost for Ethereum Hardhat
 ```bash
@@ -30,7 +32,8 @@ npx hardhat run scripts/createHTLC.js --network localhost
 
 ## Step 0.2: Setup Localhost for Bitcoin Core
 ```bash
-mux start bitcoin-regtest
+cd bitcoin-chain
+mux mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
 tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 # Make sure you are in ~/Intent-centric-DEX/bitcoin-chain
 ```
@@ -94,6 +97,12 @@ Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
 npx hardhat run scripts/withdrawHTLC.js --network localhost
 # Update withdrawHTLC.js script
 # Input: lockID, secret (preimage), htlcAddress, recipient address
+```
+
+## Step 10: To stop Bitcoin chain
+```bash
+mux stop -p ../.tmuxinator/bitcoin-chain-execute.yml
+tmux kill-session
 ```
 
 ---
