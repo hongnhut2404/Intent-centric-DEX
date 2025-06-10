@@ -1,0 +1,32 @@
+name: bitcoin-chain-execute
+root: ../bitcoin-chain
+
+on_project_start: |
+  echo "Execute preset ..."
+  chmod +x ./commands/generate-block.sh
+  chmod +x ./commands/fund-wallet.sh
+  chmod +x ./commands/panel*.sh
+  mkdir -p ./data
+
+on_project_stop: |
+  echo "Execute postset"
+
+  echo "Stopping any running bitcoind processes..."
+  ./bin/bitcoin-cli -datadir=./data stop 2>/dev/null || true
+
+  sleep 3
+  echo "Removing data folders..."
+  rm -rf ./data
+  rm -f ./mineraddress.txt
+
+  echo "Killing any leftover bitcoind processes (just in case)..."
+  pkill -f bitcoind || true
+  echo "Close successfully"
+
+windows:
+  - bash:
+      layout: 5fc9,40x23,0,0{20x23,0,0,0,20x23,60,0,1,40x23,120,0,2}
+      panes:
+        - ./commands/panel1.sh
+        - ./commands/panel2.sh
+        - ./commands/panel3.sh
