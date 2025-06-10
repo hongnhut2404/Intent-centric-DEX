@@ -31,34 +31,29 @@ npx hardhat run scripts/createHTLC.js --network localhost
 ## Step 0.2: Setup Localhost for Bitcoin Core
 ```bash
 mux start bitcoin-regtest
-tmux send-keys -t bitcoin-regtest:bash.2 "./commands/fund-wallet.sh" C-m
+tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
+# Make sure you are in ~/Intent-centric-DEX/bitcoin-chain
 ```
 
 ## Step 3: Bob Receives the Hash and create HTLC 
 Alice sends the `sha256(secret)` to Bob (via payment channel or off-chain).
 Bob uses the hash to generate the corresponding HTLC on Bitcoin.
 ```bash
-cd src/create-HTLC-contract
-go build
-./m
+go run ./src/create-HTLC-contract/*.go
 ```
 
 ## Step 4: Create Raw BTC Transaction to fund HTLC
 Send BTC from the miner address to Bob.
 
 ```bash
-cd src/create-raw-transaction
-go build
-./m
+go run ./src/create-raw-transaction/*.go
 # Input: txid (from scantxout), vout, sender address, recipient address
 # Output: raw txid
 ```
 
 ## Step 5: Sign the BTC Raw Transaction to fund HTLC
 ```bash
-cd src/sign-raw-transaction-with-key
-go build
-./m
+go run ./src/sign-raw-transaction-with-key/*.go
 # Input: txid, vout, scriptPubKey, amount (from scantxout), redeem script, raw txid, sender private key
 # Output: signed raw txid
 ```
@@ -67,16 +62,15 @@ go build
 ```bash
 bitcoin-cli sendrawtransaction <signed_raw_txid>
 # Output: broadcasted txid
-bitcoin-cli scantxoutset start "[\"addr(<address_htlc>)\"]" 
-# Store in address-test
+bitcoin-cli scantxoutset start "[\"addr(<address_htlc>)\"]" > ./data-script/utxo-htlc.json
+# Store in utxo-htlc.json
 
 ```
 
 ## Step 7: Alice Claims BTC Using Secret
 ```bash
-cd src/sign-redeem-transaction
-go build
-./m
+go run ./src/create-redeem-transaction/*.go
+go run ./src/sign-redeem-transaction/*.go
 # Input: txid, vout, recipient address, amount -> create raw transaction
 # Then input: raw txid, secret (preimage), redeem script, recipient private key, recipient public key
 # Output: signed redeem txid

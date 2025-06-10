@@ -89,7 +89,7 @@ func readPartyInfo() (map[string]interface{}, map[string]interface{}, error) {
 
 // === Read Raw Transaction ===
 func readRawTx() (string, error) {
-	path := os.Getenv("RAW_TX_INPUT")
+	path := os.Getenv("RAW_TX_OUTPUT")
 	if path == "" {
 		return "", fmt.Errorf("RAW_TX_INPUT not set in .env")
 	}

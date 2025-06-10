@@ -46,7 +46,7 @@ func ReadInput(filePath string) (map[string]interface{}, error) {
 
 // === Readers ===
 func readRedeemTransaction() (string, error) {
-	path := os.Getenv("REDEEM_TX_INPUT")
+	path := os.Getenv("REDEEM_TX_OUTPUT")
 	if path == "" {
 		return "", fmt.Errorf("REDEEM_TX_INPUT not set in .env")
 	}
