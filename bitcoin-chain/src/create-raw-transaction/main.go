@@ -6,7 +6,19 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
+
+func loadEnv() {
+	paths := []string{"../../.env", "../.env", "./.env"} // flexible search
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
+	}
+	log.Fatal("Error loading .env from known locations")
+}
 
 // === Reusable JSON Reader ===
 func ReadInput(filePath string) (map[string]interface{}, error) {
@@ -45,7 +57,7 @@ func WriteOutput(filePath string, data interface{}) error {
 
 // === Read UTXO ===
 func readUTXO() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/utxo.json"
+	path := os.Getenv("UTXO_JSON")
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -63,7 +75,7 @@ func readUTXO() (map[string]interface{}, error) {
 
 // === Read Party Info ===
 func readPartyInfo() (map[string]interface{}, map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	path := os.Getenv("ADDRESS_TEST")
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, nil, err
@@ -83,6 +95,7 @@ func readPartyInfo() (map[string]interface{}, map[string]interface{}, error) {
 
 // === Main Function ===
 func main() {
+	loadEnv()
 	firstUnspent, err := readUTXO()
 	if err != nil {
 		log.Fatalf("Failed to read UTXO: %v", err)
@@ -114,8 +127,9 @@ func main() {
 	output := map[string]interface{}{
 		"raw_transaction": rawTx1,
 	}
-
-	err = WriteOutput("/home/nhutthi/Documents/bitcoin-28.1/data-script/rawtx.json", output)
+	fmt.Println("Raw transaction: ", output["raw_transaction"].(string))
+	outputPath := os.Getenv("RAW_TX_OUTPUT")
+	err = WriteOutput(outputPath, output)
 	if err != nil {
 		log.Fatalf("Failed to write raw transaction: %v", err)
 	}
