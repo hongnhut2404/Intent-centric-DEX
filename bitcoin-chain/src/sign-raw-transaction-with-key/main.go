@@ -6,7 +6,20 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
+
+// === Load .env ===
+func loadEnv() {
+	paths := []string{"../../.env", "../.env", "./.env"}
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
+	}
+	log.Fatal("Error loading .env from known locations")
+}
 
 // === Reusable JSON Reader ===
 func ReadInput(filePath string) (map[string]interface{}, error) {
@@ -31,9 +44,11 @@ func ReadInput(filePath string) (map[string]interface{}, error) {
 }
 
 // === Read UTXO ===
-// === Read UTXO ===
 func readUTXO() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/utxo.json"
+	path := os.Getenv("UTXO_JSON")
+	if path == "" {
+		return nil, fmt.Errorf("UTXO_JSON not set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -51,7 +66,10 @@ func readUTXO() (map[string]interface{}, error) {
 
 // === Read Party Info ===
 func readPartyInfo() (map[string]interface{}, map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	path := os.Getenv("ADDRESS_TEST")
+	if path == "" {
+		return nil, nil, fmt.Errorf("ADDRESS_TEST not set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, nil, err
@@ -69,9 +87,12 @@ func readPartyInfo() (map[string]interface{}, map[string]interface{}, error) {
 	return senderList[0].(map[string]interface{}), htlcList[0].(map[string]interface{}), nil
 }
 
+// === Read Raw Transaction ===
 func readRawTx() (string, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/rawtx.json"
-
+	path := os.Getenv("RAW_TX_INPUT")
+	if path == "" {
+		return "", fmt.Errorf("RAW_TX_INPUT not set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return "", err
@@ -81,16 +102,17 @@ func readRawTx() (string, error) {
 	if !ok {
 		return "", fmt.Errorf("'raw_transaction' is not a string or missing")
 	}
-
 	return raw, nil
 }
 
 func main() {
-	// Raw transaction (claim output)
+	loadEnv()
+
 	rawTx, err := readRawTx()
 	if err != nil {
-		log.Fatalf("Failed to read info: %v", err)
+		log.Fatalf("Failed to read raw transaction: %v", err)
 	}
+
 	firstUnspent, err := readUTXO()
 	if err != nil {
 		log.Fatalf("Failed to read UTXO: %v", err)
@@ -101,34 +123,28 @@ func main() {
 		log.Fatalf("Failed to read party info: %v", err)
 	}
 
-	// Example private key (replace with actual private keys)
 	privKeys := []string{
 		senderMap["privkey"].(string),
 	}
 
-	// The previous transaction that contains the HTLqC output
 	prevTxs := []PrevTx{
 		{
 			Txid:         firstUnspent["txid"].(string),
 			Vout:         int(firstUnspent["vout"].(float64)),
-			ScriptPubKey: firstUnspent["scriptPubKey"].(string), // Updated scriptPubKey
-			RedeemScript: htlcMap["redeemScript"].(string),      // HTLC redeem script
-			Amount:       firstUnspent["amount"].(float64),      // Correct amount
+			ScriptPubKey: firstUnspent["scriptPubKey"].(string),
+			RedeemScript: htlcMap["redeemScript"].(string),
+			Amount:       firstUnspent["amount"].(float64),
 		},
 	}
 
-	// Sighash type
 	sighash := "ALL"
 
 	fmt.Printf("Raw Transaction before signing: %s\n", rawTx)
 
-	// Sign the raw transaction
 	signedTx, err := SignRawTransactionWithKey(rawTx, privKeys, prevTxs, sighash)
 	if err != nil {
-		log.Fatalf("Signing failed: %v\n", err)
-		return
+		log.Fatalf("Signing failed: %v", err)
 	}
 
-	// Print the signed transaction
 	fmt.Printf("Signed Transaction Hex: %s\n", signedTx)
 }
