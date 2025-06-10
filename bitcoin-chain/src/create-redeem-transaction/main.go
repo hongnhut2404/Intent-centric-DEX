@@ -10,8 +10,21 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/joho/godotenv"
 )
 
+// === Load .env ===
+func loadEnv() {
+	paths := []string{"../../.env", "../.env", "./.env"}
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
+	}
+	log.Fatal("Error loading .env from known locations")
+}
+
+// === Reusable JSON Reader/Writer ===
 func ReadInput(filePath string) (map[string]interface{}, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -48,7 +61,10 @@ func WriteOutput(filePath string, data interface{}) error {
 
 // === Read UTXO ===
 func readUTXO() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/utxo-htlc.json"
+	path := os.Getenv("UTXO_HTLC_JSON")
+	if path == "" {
+		return nil, fmt.Errorf("UTXO_HTLC_JSON not set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -64,9 +80,12 @@ func readUTXO() (map[string]interface{}, error) {
 	return unspents[0].(map[string]interface{}), nil
 }
 
-// === Read Party Info ===
+// === Read Receiver Info ===
 func readPartyInfo() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	path := os.Getenv("ADDRESS_TEST")
+	if path == "" {
+		return nil, fmt.Errorf("ADDRESS_TEST not set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -74,14 +93,15 @@ func readPartyInfo() (map[string]interface{}, error) {
 
 	receiverList, ok := data["receiver"].([]interface{})
 	if !ok || len(receiverList) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'sender' field")
+		return nil, fmt.Errorf("missing or invalid 'receiver' field")
 	}
 
 	return receiverList[0].(map[string]interface{}), nil
 }
 
+// === Main ===
 func main() {
-	// Regtest network parameters
+	loadEnv()
 	netParams := &chaincfg.RegressionNetParams
 
 	firstUnspent, err := readUTXO()
@@ -121,7 +141,12 @@ func main() {
 		"raw_redeem_transaction": rawTxHex,
 	}
 
-	err = WriteOutput("/home/nhutthi/Documents/bitcoin-28.1/data-script/redeem-tx.json", output)
+	outputPath := os.Getenv("REDEEM_TX_OUTPUT")
+	if outputPath == "" {
+		log.Fatal("REDEEM_TX_OUTPUT not set in .env")
+	}
+
+	err = WriteOutput(outputPath, output)
 	if err != nil {
 		log.Fatalf("Failed to write raw redeem transaction: %v", err)
 	}
