@@ -20,13 +20,6 @@ module.exports = {
         "52e90e84fbf5cd63e871bd5473e78528ce7317fe4fde6f2a71c09e63265efd9e"
       ]
     },
-    hardhat: {
-      chainId: 1337,
-      mining: {
-        auto: false,
-        interval: 60000
-      }
-    }
 
   }
 };

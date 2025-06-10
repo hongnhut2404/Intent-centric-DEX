@@ -11,7 +11,9 @@ async function main() {
   console.log("Block number:", blockNumber);
   console.log("Chain ID:", network.chainId);
   console.log("Gas price:", hre.ethers.formatUnits(gasPrice.gasPrice, "gwei"), "gwei");
-  console.log("Timestamp:", block.timestamp);
+  const date = new Date(block.timestamp * 1000); // Convert to milliseconds
+  console.log("Timestamp:", block.timestamp, "->", date.toISOString());
+
 }
 
 main().catch((err) => {
