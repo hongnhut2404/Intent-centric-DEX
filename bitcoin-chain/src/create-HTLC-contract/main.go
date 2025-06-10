@@ -6,7 +6,21 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
+
+func loadEnv() {
+	// Try to load from project root OR current folder
+	paths := []string{"../../.env", "../.env", "./.env"}
+
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
+	}
+	log.Fatal("Error loading .env from any known location")
+}
 
 func ReadInput(filePath string) (map[string]interface{}, error) {
 	file, err := os.Open(filePath)
@@ -43,7 +57,7 @@ func WriteOutput(filePath string, data interface{}) error {
 }
 
 func readSenderInfo() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	path := os.Getenv("ADDRESS_TEST")
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -51,14 +65,14 @@ func readSenderInfo() (map[string]interface{}, error) {
 
 	senderInfo, ok := data["sender"].([]interface{})
 	if !ok || len(senderInfo) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'Sender' field")
+		return nil, fmt.Errorf("missing or invalid 'sender' field")
 	}
 
 	return senderInfo[0].(map[string]interface{}), nil
 }
 
 func readReceiverInfo() (map[string]interface{}, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	path := os.Getenv("ADDRESS_TEST")
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, err
@@ -66,14 +80,14 @@ func readReceiverInfo() (map[string]interface{}, error) {
 
 	receiverInfo, ok := data["receiver"].([]interface{})
 	if !ok || len(receiverInfo) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'Receiver' field")
+		return nil, fmt.Errorf("missing or invalid 'receiver' field")
 	}
 
 	return receiverInfo[0].(map[string]interface{}), nil
 }
 
 func readSecretHash() (string, error) {
-	path := "/home/nhutthi/Documents/bitcoin-28.1/data-script/bob/exchange-data.json"
+	path := os.Getenv("EXCHANGE_DATA")
 	data, err := ReadInput(path)
 	if err != nil {
 		return "", err
@@ -111,6 +125,8 @@ func updateHTLCOutput(filePath, address, redeemScript string) error {
 }
 
 func main() {
+	loadEnv()
+
 	// Read sender info
 	sender, err := readSenderInfo()
 	if err != nil {
@@ -133,7 +149,7 @@ func main() {
 	fmt.Printf("SHA256 Hash: %s\n", hashSecretHex)
 
 	// Example locktime (block height or timestamp)
-	locktime := int64(200)
+	locktime := int64(300)
 
 	// Create HTLC contract
 	p2shAddress, redeemScriptHex, err := CreateHTLCContract(senderPubKeyHex, receiverPubKeyHex, hashSecretHex, locktime)
@@ -146,7 +162,7 @@ func main() {
 	fmt.Printf("Redeem Script Hex: %s\n", redeemScriptHex)
 
 	// Write back to JSON
-	jsonPath := "/home/nhutthi/Documents/bitcoin-28.1/data-script/address-test.json"
+	jsonPath := os.Getenv("ADDRESS_TEST")
 	err = updateHTLCOutput(jsonPath, p2shAddress, redeemScriptHex)
 	if err != nil {
 		log.Fatalf("Failed to update JSON: %v", err)

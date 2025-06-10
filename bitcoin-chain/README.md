@@ -1,5 +1,9 @@
 # Cross-chain Atomic Swap: Ethereum (Hardhat) ↔ Bitcoin Core (RegTest)
 
+## Implement package
+go get github.com/joho/godotenv
+
+
 ## Step 0.1: Setup Localhost for Ethereum Hardhat
 ```bash
 npx hardhat node
