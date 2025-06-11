@@ -92,6 +92,24 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         return intentId;
     }
 
+    event TradeExecuted(
+        uint256 indexed buyIntentId,
+        uint256 indexed sellIntentId,
+        address executor,
+        address token,        // Token to be locked (ETH/WETH)
+        address recipient,    // Buyer who will receive tokens from HTLC
+        uint256 amount        // Amount of token to be locked
+    );
+
+    event HTLCInitiate(
+        address indexed sender,
+        address indexed receiver,
+        uint256 timelock,
+        uint256 amount,
+        address token
+    );
+
+
 
     // Helper function to find the smallest compatible sell intent
     function findSmallestSellIntent(
@@ -135,46 +153,37 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
 
     // Helper function to execute a single trade
-    // function executeTrade(
-    //     BuyIntent storage buy,
-    //     SellIntent storage sell,
-    //     uint256 buyIntentId,
-    //     uint256 sellIntentId,
-    //     uint256 amountOut
-    // ) internal {
-    //     uint256 requiredAmountIn = (amountOut * buy.amountIn) / buy.minAmountOut;
+    function executeTrade(
+        BuyIntent storage buy,
+        SellIntent storage sell,
+        uint256 buyIntentId,
+        uint256 sellIntentId,
+        uint256 amountOut,
+        uint256 timelock
+    ) internal {
+        buy.status = IntentStatus.Filled;
+        sell.status = IntentStatus.Filled;
 
-    //     require(buy.tokenIn.balanceOf(buy.user) >= requiredAmountIn, "Insufficient buyer balance");
-    //     require(sell.tokenIn.balanceOf(sell.user) >= amountOut, "Insufficient seller balance");
+        emit TradeExecuted(
+            buyIntentId,
+            sellIntentId,
+            msg.sender,
+            address(sell.sellToken),
+            buy.buyer,
+            amountOut
+        );
 
-    //     buy.tokenIn.transferFrom(buy.user, sell.user, requiredAmountIn);
-    //     sell.tokenIn.transferFrom(sell.user, buy.user, amountOut);
+        emit HTLCInitiate(
+            sell.seller,
+            buy.buyer,
+            timelock,
+            amountOut,
+            address(sell.sellToken)
+        );
 
-    //     sell.amountIn -= amountOut;
-    //     sell.minAmountOut = sell.amountIn > 0 ? (sell.minAmountOut * sell.amountIn) / (sell.amountIn + amountOut) : 0;
-    //     if (sell.amountIn == 0) {
-    //         sell.status = IntentStatus.Filled;
-    //     }
+        console.log("HTLC info emitted for off-chain listener");
+    }
 
-    //     buy.amountIn -= requiredAmountIn;
-    //     buy.minAmountOut -= amountOut;
-    //     if (buy.amountIn == 0) {
-    //         buy.status = IntentStatus.Filled;
-    //     }
-
-    //     emit TradeExecuted(
-    //         buyIntentId,
-    //         sellIntentId,
-    //         msg.sender,
-    //         address(buy.tokenIn),
-    //         address(buy.tokenOut),
-    //         requiredAmountIn,
-    //         amountOut
-    //     );
-
-    //     console.log("Partial trade executed: BuyIntent", buyIntentId, "SellIntent", sellIntentId);
-    //     console.log("AmountIn:", requiredAmountIn, "AmountOut:", amountOut);
-    // }
 
     function matchIntent(uint256 buyIntentId) external nonReentrant {
         BuyIntent storage buy = buyIntents[buyIntentId];
@@ -212,15 +221,14 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             sell.status = IntentStatus.Filled;
 
             // For coordination with off-chain HTLC executor, emit an event
-            // emit TradeExecuted(
-            //     buyIntentId,
-            //     sellIntentId,
-            //     msg.sender,
-            //     address(sell.sellToken),
-            //     buy.wantToken,
-            //     amountOut,
-            //     sell.minBuyAmount
-            // );
+            emit TradeExecuted(
+                buyIntentId,
+                sellIntentId,
+                msg.sender,
+                address(sell.sellToken),
+                buy.buyer,
+                amountOut
+            );
 
             progressMade = true;
             break; // only do 1 match for now; remove this if supporting multiple fills
