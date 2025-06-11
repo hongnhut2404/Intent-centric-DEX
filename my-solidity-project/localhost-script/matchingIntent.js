@@ -43,7 +43,8 @@ async function main(){
     console.log("Owner of intentMaching: ", ownerAddress);
 
     //Create Buy Intent first
-    const buyAmount = 100n * 10n ** 18n;
+    // Alice (User1) wants to sell 100 TTA for at least 200 TTB
+    const buyAmount = 100n * 10n ** 18n; 
     const minAmountInBuy = 200n * 10n ** 18n;
     await tokenAInstance.connect(user1).approve(intentMachingAddress, buyAmount);
 
@@ -63,26 +64,12 @@ async function main(){
     await intentMatching.connect(user2).createSellIntent(
         tokenBAddress, 
         tokenAAddress,
-        sellAmount,
-        minAmountInSell,
-        Math.floor(Date.now() / 1000) + 3600
-    )
-
-    await intentMatching.connect(user2).createSellIntent(
-        tokenBAddress, 
-        tokenAAddress,
-        100n * 10n ** 18n,
-        50n * 10n ** 18n,
-        Math.floor(Date.now() / 1000) + 3600
-    )
-
-    await intentMatching.connect(user2).createSellIntent(
-        tokenBAddress, 
-        tokenAAddress,
-        50n * 10n ** 18n,
+        60n * 10n ** 18n,
         25n * 10n ** 18n,
         Math.floor(Date.now() / 1000) + 3600
     )
+
+    
     
     //Distribute tokens: TokenA -> User1, TokenB -> User2
     console.log("\nDistributing test tokens...");
