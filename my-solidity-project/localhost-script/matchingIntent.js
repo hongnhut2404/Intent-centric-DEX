@@ -73,7 +73,7 @@ async function main() {
                     sender,
                     amountETH: amountETH.toString(),
                     amountBTC: amountBTC.toString(),
-                    locktime
+                    locktime: locktime.toString()
                 };
 
                 console.log("TradeExecuted Event:", output);
@@ -81,9 +81,21 @@ async function main() {
                 // Write to file (optional)
                 fs.writeFileSync("data/trade-executed.json", JSON.stringify(output, null, 2));
                 console.log("Event written to data/trade-executed.json");
+
+                const htlcData = {
+                    htlcAddress: contractAddress, // Assuming it's done in this contract
+                    senderAddress: sender,
+                    recipientAddress: recipient,
+                    timelock: Number(locktime),
+                    amount: amountETH.toString(), // ETH being locked
+                };
+
+                fs.writeFileSync("data/htlc-initiate.json", JSON.stringify(htlcData, null, 2));
+                console.log("HTLC data written to data/htlc-initiate.json");
             }
         } catch (err) {
             // Ignore logs that can't be parsed (non-matching topics)
+            console.error("Log parsing error:", err.message);
         }
     }
 

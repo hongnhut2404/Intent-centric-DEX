@@ -40,7 +40,7 @@ function writeOutput(output, filePath) {
 
 
 async function main() {
-  const input = readInput("../data/htlc-initiate-test.json");
+  const input = readInput("../data/htlc-initiate.json");
 
   //Read input
   const htlcAddress = input.htlcAddress;
@@ -52,7 +52,7 @@ async function main() {
   const alice = await hre.ethers.getSigner(sender);
 
   const HTLC = await hre.ethers.getContractFactory("HTLC");
-  const htlc = await HTLC.attach(htlcAddress);
+  const htlc = await HTLC.attach(htlcAddress).connect(alice);
 
   // Generate unique secret
   const secret = "mysecret" + Date.now();
@@ -60,7 +60,6 @@ async function main() {
   const hashSha256 = crypto.createHash("sha256").update(secret).digest("hex"); // Bitcoin
 
   console.log("Creating lock with secret:", secret);
-
   let tx;
   try {
     tx = await htlc.connect(alice).newLock(recipient, hashKeccak, timelock, {
@@ -68,10 +67,11 @@ async function main() {
     });
   } catch (error) {
     console.error("newLock failed:", error.reason || error.message);
-    throw error;
+    throw hre.ethers.parseEther(amount);
   }
 
   const receipt = await tx.wait();
+
   if (receipt.status !== 1) {
     throw new Error("Transaction failed, check contract state or gas");
   }
@@ -90,6 +90,7 @@ async function main() {
     console.log("Raw logs:", receipt.logs);
     throw new Error("Locked event not found");
   }
+
 
   const lockId = event.args.id;
   const lock = await htlc.getLock(lockId);
