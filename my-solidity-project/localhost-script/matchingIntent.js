@@ -1,108 +1,83 @@
-const {ethers} = require('hardhat')
+const fs = require("fs");
+const { ethers } = require("hardhat");
 
-async function main(){
-    //1. Setup accounts
+async function main() {
     const [deployer, user1, user2] = await ethers.getSigners();
-    console.log("Deployer address", deployer.address);
-    console.log("User1 address", user1.address);
-    console.log("User2 address", user2.address);
-    
-    //2. Deploy
-    console.log("\nDeploying token A...");
-    const tokenA = await ethers.getContractFactory("ERC20Token");
-    const initialSupplyA = 50_000n * 10n ** 18n;
-    const tokenAInstance = await tokenA.deploy("TokenA","TTA", initialSupplyA);
-    await tokenAInstance.waitForDeployment();
+    console.log("Deployer:", deployer.address);
+    console.log("User1:", user1.address);
+    console.log("User2:", user2.address);
 
-    const tokenAAddress = await tokenAInstance.getAddress();
-    const ownerAddressOfTokenA = await tokenAInstance.owner();
-    console.log("Address of token A: ", tokenAAddress);
-    console.log("Owner of Token A:", ownerAddressOfTokenA);
-
-    //Deploy token B
-    console.log("\nDeploying token B...");
-    const tokenB = await ethers.getContractFactory("ERC20Token");
-    const initialSupplyB = 50_000n * 10n ** 18n;
-    const tokenBInstance = await tokenB.deploy("TokenB","TTB",initialSupplyB);
-    await tokenBInstance.waitForDeployment();
-
-    const tokenBAddress = await tokenBInstance.getAddress();
-    const ownerAddressOfTokenB = await tokenBInstance.owner();
-    console.log("Address of token B: ", tokenBAddress);
-    console.log("Owner of Token B: ", ownerAddressOfTokenB);
-
-    //Deploy Matching Version 1
-    console.log("\nDeploying IntentMatching...");
-    const IntentMaching = await ethers.getContractFactory("IntentMatchingVersion2");
-    const intentMatching = await IntentMaching.deploy();
+    const IntentMatching = await ethers.getContractFactory("IntentMatching");
+    const intentMatching = await IntentMatching.deploy();
     await intentMatching.waitForDeployment();
 
-    const intentMachingAddress = await intentMatching.getAddress();
-    const ownerAddress = await intentMatching.owner();  
-    console.log("Deployed to: ", intentMachingAddress);
-    console.log("Owner of intentMaching: ", ownerAddress);
+    const contractAddress = await intentMatching.getAddress();
+    console.log("IntentMatching deployed to:", contractAddress);
 
-    //Create Buy Intent first
-    // Alice (User1) wants to sell 100 TTA for at least 200 TTB
-    const buyAmount = 100n * 10n ** 18n; 
-    const minAmountInBuy = 200n * 10n ** 18n;
-    await tokenAInstance.connect(user1).approve(intentMachingAddress, buyAmount);
+    // Create BuyIntent (user1 wants ETH, offers BTC off-chain)
+    const buySellAmountBTC = 1_000_000_000; // e.g. 0.01 BTC
+    const minETHWanted = ethers.parseEther("2");
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+    const offchainIdBuy = ethers.keccak256(ethers.toUtf8Bytes("buy-eth"));
 
     await intentMatching.connect(user1).createBuyIntent(
-        tokenAAddress, 
-        tokenBAddress,
-        buyAmount,
-        minAmountInBuy,
-        Math.floor(Date.now() / 1000) + 3600
-    )
+        buySellAmountBTC,
+        minETHWanted,
+        locktime,
+        offchainIdBuy
+    );
+    console.log("BuyIntent created by User1");
 
-    //Create sell intent second
-    const sellAmount = 200n * 10n ** 18n;
-    const minAmountInSell = 100n * 10n ** 18n;
-    await tokenBInstance.connect(user2).approve(intentMachingAddress, sellAmount);
+    // Create SellIntent (user2 will lock ETH, expects BTC)
+    const sellAmountETH = ethers.parseEther("2");
+    const minBTCExpected = 1_000_000_000;
+    const deadline = Math.floor(Date.now() / 1000) + 3600;
+    const offchainIdSell = ethers.keccak256(ethers.toUtf8Bytes("sell-eth"));
 
     await intentMatching.connect(user2).createSellIntent(
-        tokenBAddress, 
-        tokenAAddress,
-        60n * 10n ** 18n,
-        25n * 10n ** 18n,
-        Math.floor(Date.now() / 1000) + 3600
-    )
-
-    
-    
-    //Distribute tokens: TokenA -> User1, TokenB -> User2
-    console.log("\nDistributing test tokens...");
-    const distributeAmount = 500n * 10n ** 18n;
-
-    await tokenAInstance.transfer(user1.address, distributeAmount);
-    await tokenBInstance.transfer(user2.address, distributeAmount);
-
-    console.log(`Sent ${ethers.formatEther(distributeAmount)} TokenA to User1`);
-    console.log(`Sent ${ethers.formatEther(distributeAmount)} TokenB to User2`);
-
-    //Before match
-    console.log("\nPre-Match Balances:");
-    console.log("User1 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user1.address)));
-    console.log("User1 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user1.address)));
-    console.log("User2 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user2.address)));
-    console.log("User2 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user2.address)));
+        sellAmountETH,
+        minBTCExpected,
+        deadline,
+        offchainIdSell
+    );
+    console.log("SellIntent created by User2");
 
     console.log("\nMatching intents...");
     const matchTx = await intentMatching.matchIntent(
         0 // buyIntentId
     );
-    await matchTx.wait();
+    const receipt = await matchTx.wait();
     console.log("Intents matched successfully!");
 
-    //After match
-    console.log("\nAfter-Match Balances:");
-    console.log("User1 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user1.address)));
-    console.log("User1 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user1.address)));
-    console.log("User2 TTA:", ethers.formatEther(await tokenAInstance.balanceOf(user2.address)));
-    console.log("User2 TTB:", ethers.formatEther(await tokenBInstance.balanceOf(user2.address)));
+    // Parse the TradeExecuted event from the receipt
+    for (const log of receipt.logs) {
+        try {
+            const parsed = intentMatching.interface.parseLog(log);
+            if (parsed.name === "TradeExecuted") {
+                const [buyIntentId, sellIntentId, executor, token, recipient, amount] = parsed.args;
+                const output = {
+                    buyIntentId: Number(buyIntentId),
+                    sellIntentId: Number(sellIntentId),
+                    executor,
+                    token,
+                    recipient,
+                    amount: amount.toString()
+                };
+
+                console.log("TradeExecuted Event:", output);
+
+                // Write to file (optional)
+                fs.writeFileSync("data/trade-executed.json", JSON.stringify(output, null, 2));
+                console.log("Event written to data/trade-executed.json");
+            }
+        } catch (err) {
+            // Ignore logs that can't be parsed (non-matching topics)
+        }
+    }
+
 }
-main().catch(error => {
-    console.error("Error:", error.message);
+
+main().catch((err) => {
+    console.error("Error:", err.message);
     process.exit(1);
 });

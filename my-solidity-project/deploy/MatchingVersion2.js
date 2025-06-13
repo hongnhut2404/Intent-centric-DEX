@@ -94,6 +94,7 @@ async function main(){
         Math.floor(Date.now() / 1000) + 3600
     )
     
+    
     //Distribute tokens: TokenA -> User1, TokenB -> User2
     console.log("\nDistributing test tokens...");
     const distributeAmount = 500n * 10n ** 18n;

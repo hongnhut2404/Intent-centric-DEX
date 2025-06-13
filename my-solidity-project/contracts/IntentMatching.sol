@@ -14,7 +14,6 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct BuyIntent {
         address buyer;
-        address wantToken;
         uint256 sellAmount;      // BTC amount (off-chain)
         uint256 minBuyAmount;    // ETH expected (on-chain)
         uint256 locktime;
@@ -25,7 +24,6 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct SellIntent {
         address seller;
-        address sellToken;
         uint256 sellAmount;
         uint256 minBuyAmount;    // BTC expected (off-chain)
         uint256 deadline;
@@ -38,11 +36,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
     mapping(uint256 => BuyIntent) public buyIntents;
     mapping(uint256 => SellIntent) public sellIntents;
 
-    event BuyIntentCreated(uint256 indexed intentId, address indexed buyer, address indexed wantToken, uint256 sellAmount, uint256 minBuyAmount, uint256 locktime);
-    event SellIntentCreated(uint256 indexed intentId, address indexed seller, address indexed sellToken, uint256 sellAmount, uint256 minBuyAmount, uint256 deadline);
+    event BuyIntentCreated(uint256 indexed intentId, address indexed buyer, uint256 sellAmount, uint256 minBuyAmount, uint256 locktime);
+    event SellIntentCreated(uint256 indexed intentId, address indexed seller, uint256 sellAmount, uint256 minBuyAmount, uint256 deadline);
 
     function createBuyIntent(
-        address wantToken,
         uint256 sellAmount,
         uint256 minBuyAmount,
         uint256 locktime,
@@ -54,7 +51,6 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 intentId = intentCountBuy++;
         buyIntents[intentId] = BuyIntent({
             buyer: msg.sender,
-            wantToken: wantToken,
             sellAmount: sellAmount,
             minBuyAmount: minBuyAmount,
             locktime: locktime,
@@ -63,12 +59,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit BuyIntentCreated(intentId, msg.sender, wantToken, sellAmount, minBuyAmount, locktime);
+        emit BuyIntentCreated(intentId, msg.sender, sellAmount, minBuyAmount, locktime);
         return intentId;
     }
 
     function createSellIntent(
-        address sellToken,
         uint256 sellAmount,
         uint256 minBuyAmount,
         uint256 deadline,
@@ -80,7 +75,6 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 intentId = intentCountSell++;
         sellIntents[intentId] = SellIntent({
             seller: msg.sender,
-            sellToken: sellToken,
             sellAmount: sellAmount,
             minBuyAmount: minBuyAmount,
             deadline: deadline,
@@ -88,7 +82,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit SellIntentCreated(intentId, msg.sender, sellToken, sellAmount, minBuyAmount, deadline);
+        emit SellIntentCreated(intentId, msg.sender, sellAmount, minBuyAmount, deadline);
         return intentId;
     }
 
@@ -129,11 +123,6 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 continue;
             }
 
-            // Match token being sold to what buyer wants
-            if (sell.sellToken != buy.wantToken) {
-                continue;
-            }
-
             // Seller's effective price = (BTC_expected * 1e18) / ETH_selling
             uint256 sellerEffectivePrice = (sell.minBuyAmount * 1e18) / sell.sellAmount;
 
@@ -168,7 +157,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             buyIntentId,
             sellIntentId,
             msg.sender,
-            address(sell.sellToken),
+            address(0),
             buy.buyer,
             amountOut
         );
@@ -178,7 +167,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             buy.buyer,
             timelock,
             amountOut,
-            address(sell.sellToken)
+            address(0)
         );
 
         console.log("HTLC info emitted for off-chain listener");
@@ -225,7 +214,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 buyIntentId,
                 sellIntentId,
                 msg.sender,
-                address(sell.sellToken),
+                address(0),
                 buy.buyer,
                 amountOut
             );
