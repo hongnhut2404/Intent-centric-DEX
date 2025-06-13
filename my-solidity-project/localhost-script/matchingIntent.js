@@ -35,8 +35,20 @@ async function main() {
     const offchainIdSell = ethers.keccak256(ethers.toUtf8Bytes("sell-eth"));
 
     await intentMatching.connect(user2).createSellIntent(
-        sellAmountETH,
-        minBTCExpected,
+        ethers.parseEther("2"),
+        900_000_000,
+        deadline,
+        offchainIdSell
+    );
+    await intentMatching.connect(user2).createSellIntent(
+        ethers.parseEther("1"),
+        500_000_000,
+        deadline,
+        offchainIdSell
+    );
+    await intentMatching.connect(user2).createSellIntent(
+        ethers.parseEther("2"),
+        1_200_000_000,
         deadline,
         offchainIdSell
     );
