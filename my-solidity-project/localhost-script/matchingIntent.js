@@ -66,14 +66,15 @@ async function main() {
         try {
             const parsed = intentMatching.interface.parseLog(log);
             if (parsed.name === "TradeExecuted") {
-                const [buyIntentId, sellIntentId, executor, token, recipient, amount] = parsed.args;
+                const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC] = parsed.args;
                 const output = {
                     buyIntentId: Number(buyIntentId),
                     sellIntentId: Number(sellIntentId),
-                    executor,
-                    token,
                     recipient,
-                    amount: amount.toString()
+                    token,
+                    sender,
+                    amountETH: amountETH.toString(),
+                    amountBTC: amountBTC.toString(),
                 };
 
                 console.log("TradeExecuted Event:", output);

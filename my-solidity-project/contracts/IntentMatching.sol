@@ -92,7 +92,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         address executor,
         address token,        // Token to be locked (ETH/WETH)
         address recipient,    // Buyer who will receive tokens from HTLC
-        uint256 amount        // Amount of token to be locked
+        uint256 amountETH,        // Amount of token to be locked
+        uint256 amountBTC        // Amount of token to be locked
     );
 
     event HTLCInitiate(
@@ -159,7 +160,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             msg.sender,
             address(0),
             buy.buyer,
-            amountOut
+            amountOut,
+            buy.sellAmount
         );
 
         emit HTLCInitiate(
@@ -213,10 +215,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             emit TradeExecuted(
                 buyIntentId,
                 sellIntentId,
-                msg.sender,
+                sell.seller,
                 address(0),
                 buy.buyer,
-                amountOut
+                amountOut / 1e18,
+                buy.sellAmount
             );
 
             progressMade = true;
