@@ -44,7 +44,7 @@ async function main() {
 
   //Read input
   const htlcAddress = input.htlcAddress;
-  const timelock = Math.floor(Date.now() / 1000) + input.timelock;
+  const timelock = input.timelock;
   const recipient = input.recipientAddress; // Bob
   const sender = input.senderAddress; //Alice
   const amount = input.amount;

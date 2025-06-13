@@ -5,6 +5,35 @@ go get github.com/joho/godotenv
 
 dnf install tmux
 
+## Workflow
+- Step 0: Setup
+In Ethereum node, setup a list of Buy Intent(s) and Sell Intent(s) (Intents are generated hardcode in code)
+Buy Intent is created by User to sell BTC, buy ETH
+Sell Intent is created by Solver to sell ETH, buy BTC
+
+- Step 1: Intent Matching
+Use an algorithm to match the Buy Intent with a list of Sell Intent(s) 
+After the Intents are matched, the information about the Intent Matching is stored in a htlc-initiate.json file
+
+- Step 2: Create and deploy the HTLC
+Alice (Solver) deploy the HTLC to receive the address of HTLC contract instance 
+Use that address and Intent Matching data to create the HTLC for 2 parties. The information about HTLC (secret preimage, secret hash, HTLC address, etc)
+
+- Step 3: Exchange data
+The secret hash, lockID, timelock, amount BTC needed will be stored in exchange-data.json to give to Bob (User)
+
+- Step 4: Bob create HTLC
+Bob receives the information in exchange data to create a HTLC in Bitcoin chain
+
+- Step 5: Alice claim BTC
+Alice will use the secret preimage to create a redeem transaction -> sign that transaction -> broadcase transaction via sendrawtransaction -> Alice claim the BTC from Bob
+
+- Step 6: Alice public preimage
+Alice will public preimage through json file and send to Bob
+
+- Step 7: Bob claim ETH
+Bob use preimage to create a withdrawHTLC to claim ETH
+
 
 ## Step 0.1: Setup Localhost for Ethereum Hardhat
 ```bash
@@ -110,7 +139,14 @@ tmux kill-session
 > ✅ Atomic swap is complete: BTC to Alice, ETH to Bob
 
 ## Note
-- The locktime needs to be implemted in code of create-HTLC-contract
-- The amount of funds locked in HTLC needs to be input in code
-- Functions are still repeated in code (need to be implemented in module)
-- Refund function is still in hardcode
+### Overview
+- In this repo, we demonstrate the ETH localhost chain and Bitcoin Core is 2 sepereted folder
+- There is still no payment channel to exchange the json file for information
+- There is still no option to resolve the conflict
+
+### Ethereum
+- There are still some problems with Intent Matching Algorithm
+- The generation of Buy Intent and Sell Intent is implemented directly in code (hard code) -> need to be changed into a function
+
+### Bitcoin
+- Still implemted the amount of BTC in hard code -> need to change into reading the amount from json files
