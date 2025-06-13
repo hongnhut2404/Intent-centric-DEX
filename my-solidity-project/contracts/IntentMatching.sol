@@ -24,7 +24,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct SellIntent {
         address seller;
-        uint256 sellAmount;
+        uint256 sellAmount;      // ETH sell 
         uint256 minBuyAmount;    // BTC expected (off-chain)
         uint256 deadline;
         IntentStatus status;
@@ -93,7 +93,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         address token,        // Token to be locked (ETH/WETH)
         address recipient,    // Buyer who will receive tokens from HTLC
         uint256 amountETH,        // Amount of token to be locked
-        uint256 amountBTC        // Amount of token to be locked
+        uint256 amountBTC,        // Amount of token to be locked
+        uint256 locktime
     );
 
     event HTLCInitiate(
@@ -161,7 +162,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             address(0),
             buy.buyer,
             amountOut,
-            buy.sellAmount
+            buy.sellAmount,
+            buy.locktime
         );
 
         emit HTLCInitiate(
@@ -219,7 +221,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 address(0),
                 buy.buyer,
                 amountOut / 1e18,
-                buy.sellAmount
+                buy.sellAmount / 1e8,
+                buy.locktime
             );
 
             progressMade = true;

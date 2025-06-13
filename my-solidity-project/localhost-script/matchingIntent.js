@@ -15,8 +15,8 @@ async function main() {
     console.log("IntentMatching deployed to:", contractAddress);
 
     // Create BuyIntent (user1 wants ETH, offers BTC off-chain)
-    const buySellAmountBTC = 1_000_000_000; // e.g. 0.01 BTC
-    const minETHWanted = ethers.parseEther("2");
+    const buySellAmountBTC = 200_000_000; // e.g. 20 BTC
+    const minETHWanted = ethers.parseEther("10");
     const locktime = Math.floor(Date.now() / 1000) + 3600;
     const offchainIdBuy = ethers.keccak256(ethers.toUtf8Bytes("buy-eth"));
 
@@ -29,25 +29,23 @@ async function main() {
     console.log("BuyIntent created by User1");
 
     // Create SellIntent (user2 will lock ETH, expects BTC)
-    const sellAmountETH = ethers.parseEther("2");
-    const minBTCExpected = 1_000_000_000;
     const deadline = Math.floor(Date.now() / 1000) + 3600;
     const offchainIdSell = ethers.keccak256(ethers.toUtf8Bytes("sell-eth"));
 
     await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("2"),
+        ethers.parseEther("20"),
         900_000_000,
         deadline,
         offchainIdSell
     );
     await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("1"),
-        500_000_000,
+        ethers.parseEther("5"),
+        100_000_000,
         deadline,
         offchainIdSell
     );
     await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("2"),
+        ethers.parseEther("20"),
         1_200_000_000,
         deadline,
         offchainIdSell
@@ -66,7 +64,7 @@ async function main() {
         try {
             const parsed = intentMatching.interface.parseLog(log);
             if (parsed.name === "TradeExecuted") {
-                const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC] = parsed.args;
+                const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] = parsed.args;
                 const output = {
                     buyIntentId: Number(buyIntentId),
                     sellIntentId: Number(sellIntentId),
@@ -75,6 +73,7 @@ async function main() {
                     sender,
                     amountETH: amountETH.toString(),
                     amountBTC: amountBTC.toString(),
+                    locktime
                 };
 
                 console.log("TradeExecuted Event:", output);
