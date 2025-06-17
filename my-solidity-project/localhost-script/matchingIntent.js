@@ -1,7 +1,12 @@
 const fs = require("fs");
 const { ethers } = require("hardhat");
 
-async function createBuyIntent(intentMatching, user, sellAmountBTC, minETHWanted, locktime, offchainIdStr) {
+function toSatoshi(btcFloat) {
+    return Math.round(btcFloat * 1e8); // Convert BTC to satoshi as integer
+}
+
+async function createBuyIntent(intentMatching, user, btcAmount, minETHWanted, locktime, offchainIdStr) {
+    const sellAmountBTC = toSatoshi(btcAmount);
     const offchainId = ethers.keccak256(ethers.toUtf8Bytes(offchainIdStr));
     const tx = await intentMatching.connect(user).createBuyIntent(
         sellAmountBTC,
@@ -13,8 +18,9 @@ async function createBuyIntent(intentMatching, user, sellAmountBTC, minETHWanted
     console.log(`BuyIntent created by ${user.address}`);
 }
 
-async function createSellIntent(intentMatching, user, ethAmount, minBTCExpected, deadline, offchainIdStr) {
+async function createSellIntent(intentMatching, user, ethAmount, minBTC, deadline, offchainIdStr) {
     const offchainId = ethers.keccak256(ethers.toUtf8Bytes(offchainIdStr));
+    const minBTCExpected = toSatoshi(minBTC);
     const tx = await intentMatching.connect(user).createSellIntent(
         ethers.parseEther(ethAmount.toString()),
         minBTCExpected,
@@ -42,16 +48,16 @@ async function main() {
     // Create BuyIntent (user1 wants ETH, offers BTC off-chain)
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    await createBuyIntent(intentMatching, user1, 200_000_000, 10, locktime, "buy-eth");
+    await createBuyIntent(intentMatching, user1, 2, 10, locktime, "buy-eth");
     console.log("BuyIntent created by User1");
 
     // Create SellIntent (user2 will lock ETH, expects BTC)
     const deadline = Math.floor(Date.now() / 1000) + 3600;
     const offchainIdSell = ethers.keccak256(ethers.toUtf8Bytes("sell-eth"));
 
-    await createSellIntent(intentMatching, user2, 20, 900_000_000, deadline, "sell-eth");
-    await createSellIntent(intentMatching, user2, 5, 100_000_000, deadline, "sell-eth");
-    await createSellIntent(intentMatching, user2, 20, 1_200_000_000, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 0.1, 9, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 5, 1, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 20, 12, deadline, "sell-eth");
 
     console.log("\nMatching intents...");
     const matchTx = await intentMatching.matchIntent(

@@ -1,7 +1,7 @@
 {
-  "htlcAddress": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "htlcAddress": "0x9A676e781A523b5d0C0e43731313A708CB607508",
   "senderAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
   "recipientAddress": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-  "timelock": 1750147499,
-  "amount": "5"
+  "timelock": 1750149316,
+  "amount": "0"
 }
