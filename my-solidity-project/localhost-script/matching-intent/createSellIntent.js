@@ -1,6 +1,6 @@
 const { ethers } = require("hardhat");
 const fs = require("fs");
-const { createSellIntent } = require("./utils/intentHelpers");
+const { createSellIntent } = require("../utils/intentHelpers");
 
 async function main() {
     const [_, __, user2] = await ethers.getSigners();
