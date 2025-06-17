@@ -27,7 +27,7 @@ function readInput(filePath) {
 }
 
 async function main() {
-  const input = readInput("../data/htlc-data.json");
+  const input = readInput("../../data/htlc-data.json");
 
   // Read input data 
   const htlcAddress = input.htlcAddress; 

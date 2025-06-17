@@ -8,7 +8,7 @@ async function main() {
   await htlc.waitForDeployment();
   console.log("HTLC deployed to:", htlc.target);
 
-  const filePath = path.join(__dirname, "../data/htlc-initiate.json");
+  const filePath = path.join(__dirname, "../../data/htlc-initiate.json");
 
   let data = {};
   if (fs.existsSync(filePath)) {

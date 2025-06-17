@@ -40,7 +40,7 @@ function writeOutput(output, filePath) {
 
 
 async function main() {
-  const input = readInput("../data/htlc-initiate.json");
+  const input = readInput("../../data/htlc-initiate.json");
 
   //Read input
   const htlcAddress = input.htlcAddress;
