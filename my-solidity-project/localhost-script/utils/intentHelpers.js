@@ -30,9 +30,39 @@ async function createSellIntent(intentMatching, user, ethAmount, minBTC, deadlin
     console.log(`SellIntent created by ${user.address}: ${ethAmount} ETH for ${minBTCExpected / 1e8} BTC`);
 }
 
+async function printAllIntents(intentMatching) {
+  const buyCount = await intentMatching.intentCountBuy();
+  const sellCount = await intentMatching.intentCountSell();
+
+  console.log("---- Buy Intents ----");
+  for (let i = 0; i < buyCount; i++) {
+    const intent = await intentMatching.getBuyIntent(i);
+    console.log(`ID ${i}:`, {
+      buyer: intent.buyer,
+      sellAmountBTC: Number(intent.sellAmount) / 1e8,
+      minBuyAmountETH: Number(intent.minBuyAmount) / 1e18,
+      status: intent.status,
+      locktime: Number(intent.locktime)
+    });
+  }
+
+  console.log("\n---- Sell Intents ----");
+  for (let i = 0; i < sellCount; i++) {
+    const intent = await intentMatching.getSellIntent(i);
+    console.log(`ID ${i}:`, {
+      seller: intent.seller,
+      sellAmountETH: Number(intent.sellAmount) / 1e18,
+      minBuyAmountBTC: Number(intent.minBuyAmount) / 1e8,
+      status: intent.status,
+      deadline: Number(intent.deadline)
+    });
+  }
+}
+
 
 module.exports = {
     toSatoshi,
     createBuyIntent,
-    createSellIntent
+    createSellIntent,
+    printAllIntents
 };
