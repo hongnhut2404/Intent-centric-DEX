@@ -1,6 +1,31 @@
 const fs = require("fs");
 const { ethers } = require("hardhat");
 
+async function createBuyIntent(intentMatching, user, sellAmountBTC, minETHWanted, locktime, offchainIdStr) {
+    const offchainId = ethers.keccak256(ethers.toUtf8Bytes(offchainIdStr));
+    const tx = await intentMatching.connect(user).createBuyIntent(
+        sellAmountBTC,
+        ethers.parseEther(minETHWanted.toString()),
+        locktime,
+        offchainId
+    );
+    await tx.wait();
+    console.log(`BuyIntent created by ${user.address}`);
+}
+
+async function createSellIntent(intentMatching, user, ethAmount, minBTCExpected, deadline, offchainIdStr) {
+    const offchainId = ethers.keccak256(ethers.toUtf8Bytes(offchainIdStr));
+    const tx = await intentMatching.connect(user).createSellIntent(
+        ethers.parseEther(ethAmount.toString()),
+        minBTCExpected,
+        deadline,
+        offchainId
+    );
+    await tx.wait();
+    console.log(`SellIntent created by ${user.address}: ${ethAmount} ETH for ${minBTCExpected / 1e8} BTC`);
+}
+
+
 async function main() {
     const [deployer, user1, user2] = await ethers.getSigners();
     console.log("Deployer:", deployer.address);
@@ -15,42 +40,18 @@ async function main() {
     console.log("IntentMatching deployed to:", contractAddress);
 
     // Create BuyIntent (user1 wants ETH, offers BTC off-chain)
-    const buySellAmountBTC = 200_000_000; // e.g. 20 BTC
-    const minETHWanted = ethers.parseEther("10");
     const locktime = Math.floor(Date.now() / 1000) + 3600;
-    const offchainIdBuy = ethers.keccak256(ethers.toUtf8Bytes("buy-eth"));
 
-    await intentMatching.connect(user1).createBuyIntent(
-        buySellAmountBTC,
-        minETHWanted,
-        locktime,
-        offchainIdBuy
-    );
+    await createBuyIntent(intentMatching, user1, 200_000_000, 10, locktime, "buy-eth");
     console.log("BuyIntent created by User1");
 
     // Create SellIntent (user2 will lock ETH, expects BTC)
     const deadline = Math.floor(Date.now() / 1000) + 3600;
     const offchainIdSell = ethers.keccak256(ethers.toUtf8Bytes("sell-eth"));
 
-    await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("20"),
-        900_000_000,
-        deadline,
-        offchainIdSell
-    );
-    await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("5"),
-        100_000_000,
-        deadline,
-        offchainIdSell
-    );
-    await intentMatching.connect(user2).createSellIntent(
-        ethers.parseEther("20"),
-        1_200_000_000,
-        deadline,
-        offchainIdSell
-    );
-    console.log("SellIntent created by User2");
+    await createSellIntent(intentMatching, user2, 20, 900_000_000, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 5, 100_000_000, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 20, 1_200_000_000, deadline, "sell-eth");
 
     console.log("\nMatching intents...");
     const matchTx = await intentMatching.matchIntent(
