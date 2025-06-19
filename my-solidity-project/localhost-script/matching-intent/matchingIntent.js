@@ -25,7 +25,7 @@ async function main() {
     // Create SellIntent (user2 will lock ETH, expects BTC)
     const deadline = Math.floor(Date.now() / 1000) + 3600;
 
-    await createSellIntent(intentMatching, user2, 0.1, 9, deadline, "sell-eth");
+    await createSellIntent(intentMatching, user2, 15, 9, deadline, "sell-eth");
     await createSellIntent(intentMatching, user2, 5, 1, deadline, "sell-eth");
     await createSellIntent(intentMatching, user2, 20, 12, deadline, "sell-eth");
 
