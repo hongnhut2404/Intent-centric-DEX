@@ -2,7 +2,6 @@
 
 ## Implement package
 go get github.com/joho/godotenv
-
 dnf install tmux
 
 ## Workflow
