@@ -82,7 +82,7 @@ npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
 ## Step 0.2: Setup Localhost for Bitcoin Core
 ```bash
 cd bitcoin-chain
-mux mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
+mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
 tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 # Make sure you are in ~/Intent-centric-DEX/bitcoin-chain
 ```

@@ -121,8 +121,8 @@ async function main() {
     lockId,
   }
 
-  writeOutput(output, "../data/htlc-data.json");
-  writeOutput(exchangeData, "../data/exchange-data.json");
+  writeOutput(output, "../../data/htlc-data.json");
+  writeOutput(exchangeData, "../../data/exchange-data.json");
 }
 
 main().catch((error) => {

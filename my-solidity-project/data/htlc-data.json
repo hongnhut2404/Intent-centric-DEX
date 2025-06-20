@@ -1,10 +1,10 @@
 {
   "htlcAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-  "secret": "mysecret1749810223167",
-  "hashKeccak": "0xb22ea9044c6e2df415739eca71735aba32f1dfe03c4e3686a4c97ffcdf40a655",
-  "hashSha256": "ab3cfe94f5b995a49821744fc67f421946703d5c8ac14c1242ed30790fcd37cd",
-  "timelock": 1749813808,
-  "lockId": "0x6b90d7f09e07c7fcc54b9ee88458a4910ef36df72e890a2714bf12ec2ed37733",
+  "secret": "mysecret1750404911389",
+  "hashKeccak": "0x1ab265adbefda5a2ddb1b9ca23f507c78272702f82c210cb078a680ccfdca01f",
+  "hashSha256": "6098afe4d70d38c67053373725c734d26c787048d630a46ecc6930707fe39960",
+  "timelock": 1750408262,
+  "lockId": "0x4efd07decd8d7a96a3ae4c6c24dbc139af3a7f0307024917fa315ccea41156e0",
   "sender": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
   "recipient": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
   "amount": "5"
