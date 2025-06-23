@@ -88,7 +88,7 @@ tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 ```
 
 ## Step 6: Bob Receives the Hash and create HTLC 
-Alice sends the `sha256(secret)` to Bob (via payment channel or off-chain).
+Alice sends the `sha256(secret)` to Bob.
 Bob uses the hash to generate the corresponding HTLC on Bitcoin.
 ```bash
 go run ./src/create-HTLC-contract/*.go

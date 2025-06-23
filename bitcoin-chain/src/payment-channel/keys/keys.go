@@ -1,8 +1,8 @@
-// === keys/keys.go ===
 package keys
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -11,17 +11,70 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
-func GenerateAndStoreKeys(stateFile string) {
+type KeyInfo struct {
+	PrivKey string `json:"privkey"`
+	PubKey  string `json:"pubkey"`
+	Address string `json:"address"`
+}
+
+type State struct {
+	Alice *KeyInfo `json:"alice,omitempty"`
+	Bob   *KeyInfo `json:"bob,omitempty"`
+}
+
+func GenerateAndStoreKeys(stateFile string, role string) {
+	if role != "alice" && role != "bob" {
+		fmt.Println("Invalid role. Must be 'alice' or 'bob'")
+		return
+	}
+
+	// Generate private key
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
 		panic(err)
 	}
 	pubKey := privKey.PubKey()
 
-	addr, _ := btcutil.NewAddressPubKey(pubKey.SerializeCompressed(), &chaincfg.RegressionNetParams)
-	fmt.Println("Generated Key:")
-	fmt.Println("Private:", hex.EncodeToString(privKey.Serialize()))
-	fmt.Println("Address:", addr.EncodeAddress())
-	// Store keys in JSON (skipped here for brevity)
-	_ = os.WriteFile(stateFile, []byte("{\"privkey\":\""+hex.EncodeToString(privKey.Serialize())+"\"}"), 0644)
+	// Generate address for regtest
+	address, err := btcutil.NewAddressPubKey(pubKey.SerializeCompressed(), &chaincfg.RegressionNetParams)
+	if err != nil {
+		panic(err)
+	}
+
+	keyInfo := &KeyInfo{
+		PrivKey: hex.EncodeToString(privKey.Serialize()),
+		PubKey:  hex.EncodeToString(pubKey.SerializeCompressed()),
+		Address: address.EncodeAddress(),
+	}
+
+	fmt.Printf("Generated %s key:\n", role)
+	fmt.Println("Private Key:", keyInfo.PrivKey)
+	fmt.Println("Public Key :", keyInfo.PubKey)
+	fmt.Println("Address    :", keyInfo.Address)
+
+	// Load existing state.json if it exists
+	var state State
+	if _, err := os.Stat(stateFile); err == nil {
+		data, err := os.ReadFile(stateFile)
+		if err == nil {
+			json.Unmarshal(data, &state)
+		}
+	}
+
+	// Update state with new key
+	if role == "alice" {
+		state.Alice = keyInfo
+	} else {
+		state.Bob = keyInfo
+	}
+
+	// Save back to state file
+	newData, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := os.WriteFile(stateFile, newData, 0644); err != nil {
+		panic(err)
+	}
 }
