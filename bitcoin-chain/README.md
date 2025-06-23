@@ -170,3 +170,15 @@ tmux kill-session
 
 ### Bitcoin
 - Still implemted the amount of BTC in hard code -> need to change into reading the amount from json files
+
+
+go run main.go init alice
+go run main.go init bob
+go run main.go multisig
+go run main.go htlc <sha256(secret)> 1700000000
+go run main.go fund
+go run main.go commit
+go run main.go sign <preimage>
+go run main.go settle
+# After timeout
+go run main.go refund
