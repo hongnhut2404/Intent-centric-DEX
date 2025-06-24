@@ -53,23 +53,17 @@ func CreateCommitmentTx(stateFile string) error {
 
 	// Convert amounts and addresses
 	amountSatoshi := int64(state.HTLC.Amount * 1e8)
+	fee := int64(500)
 
-	// Create a new transaction
 	tx := wire.NewMsgTx(wire.TxVersion)
 
-	// Add input (HTLC UTXO)
 	hash, err := chainhash.NewHashFromStr(state.HTLC.Txid)
 	if err != nil {
 		return fmt.Errorf("invalid txid: %v", err)
 	}
-	outPoint := wire.NewOutPoint(hash, state.HTLC.Vout)
-	txIn := wire.NewTxIn(outPoint, nil, nil)
+	txIn := wire.NewTxIn(wire.NewOutPoint(hash, state.HTLC.Vout), nil, nil)
 	tx.AddTxIn(txIn)
 
-	// Estimate fee (static for simplicity)
-	fee := int64(500) // in satoshis
-
-	// Create output to Alice (P2PKH)
 	addr, err := btcutil.DecodeAddress(state.Alice.Address, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return fmt.Errorf("invalid Alice address: %v", err)
@@ -78,23 +72,15 @@ func CreateCommitmentTx(stateFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create output script: %v", err)
 	}
-	txOut := wire.NewTxOut(amountSatoshi-fee, pkScript)
-	tx.AddTxOut(txOut)
+	tx.AddTxOut(wire.NewTxOut(amountSatoshi-fee, pkScript))
 
-	// Serialize transaction
 	var buf bytes.Buffer
-	tx.Serialize(&buf)
-	rawTxHex := hex.EncodeToString(buf.Bytes())
-
-	fmt.Println("Unsigned Commitment Transaction (hex):", rawTxHex)
-
-	// Optionally store to file
-	err = os.WriteFile("data/commit-unsigned.txt", []byte(rawTxHex), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write raw tx: %v", err)
+	if err := tx.Serialize(&buf); err != nil {
+		return fmt.Errorf("serialize error: %v", err)
 	}
-
-	return nil
+	rawTxHex := hex.EncodeToString(buf.Bytes())
+	fmt.Println("Unsigned Commitment Transaction (hex):", rawTxHex)
+	return os.WriteFile("data/commit-unsigned.txt", []byte(rawTxHex), 0644)
 }
 
 func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
@@ -107,10 +93,9 @@ func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
 		return fmt.Errorf("invalid JSON: %v", err)
 	}
 
-	// Basic checks
 	totalAmount := int64(state.HTLC.Amount * 1e8)
 	bobAmountSat := int64(bobAmount * 1e8)
-	fee := int64(500) // fixed fee
+	fee := int64(500)
 
 	if bobAmountSat+fee > totalAmount {
 		return fmt.Errorf("invalid amount: bobAmount + fee exceeds total")
@@ -119,7 +104,6 @@ func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
 
 	tx := wire.NewMsgTx(wire.TxVersion)
 
-	// Add input from HTLC
 	hash, err := chainhash.NewHashFromStr(state.HTLC.Txid)
 	if err != nil {
 		return fmt.Errorf("invalid txid: %v", err)
@@ -127,7 +111,6 @@ func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
 	txIn := wire.NewTxIn(wire.NewOutPoint(hash, state.HTLC.Vout), nil, nil)
 	tx.AddTxIn(txIn)
 
-	// Output to Bob
 	bobAddr, err := btcutil.DecodeAddress(state.Bob.Address, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return fmt.Errorf("invalid Bob address: %v", err)
@@ -138,7 +121,6 @@ func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
 	}
 	tx.AddTxOut(wire.NewTxOut(bobAmountSat, bobScript))
 
-	// Output to Alice
 	aliceAddr, err := btcutil.DecodeAddress(state.Alice.Address, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return fmt.Errorf("invalid Alice address: %v", err)
@@ -149,19 +131,11 @@ func CreateCommitmentTxWithAmount(stateFile string, bobAmount float64) error {
 	}
 	tx.AddTxOut(wire.NewTxOut(aliceAmountSat, aliceScript))
 
-	// Serialize tx
 	var buf bytes.Buffer
 	if err := tx.Serialize(&buf); err != nil {
-		return fmt.Errorf("failed to serialize tx: %v", err)
+		return fmt.Errorf("serialize error: %v", err)
 	}
-	rawTx := hex.EncodeToString(buf.Bytes())
-
-	fmt.Println("Unsigned Commitment Transaction (hex):", rawTx)
-
-	err = os.WriteFile("data/commit-unsigned.txt", []byte(rawTx), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write raw tx to file: %v", err)
-	}
-
-	return nil
+	rawTxHex := hex.EncodeToString(buf.Bytes())
+	fmt.Println("Unsigned Commitment Transaction (hex):", rawTxHex)
+	return os.WriteFile("data/commit-unsigned.txt", []byte(rawTxHex), 0644)
 }

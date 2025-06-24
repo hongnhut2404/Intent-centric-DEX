@@ -62,57 +62,64 @@ func SignCommitmentTx(statePath string) error {
 		return fmt.Errorf("failed to parse tx: %v", err)
 	}
 
-	// Decode redeem script
 	redeemScript, err := hex.DecodeString(state.HTLC.RedeemScript)
 	if err != nil {
 		return fmt.Errorf("invalid redeem script: %v", err)
 	}
 
-	// Decode private keys
 	alicePrivKeyBytes, _ := hex.DecodeString(state.Alice.PrivKey)
 	alicePrivKey, _ := btcec.PrivKeyFromBytes(alicePrivKeyBytes)
 
 	bobPrivKeyBytes, _ := hex.DecodeString(state.Bob.PrivKey)
 	bobPrivKey, _ := btcec.PrivKeyFromBytes(bobPrivKeyBytes)
 
-	// ---- SIGNING ----
+	amount := int64(state.HTLC.Amount * 1e8)
 
-	// Clear scriptSig before signing (very important!)
-	tx.TxIn[0].SignatureScript = nil
-
-	// Compute sighash for legacy P2SH input
-	sighash, err := txscript.CalcSignatureHash(redeemScript, txscript.SigHashAll, tx, 0)
-	if err != nil {
-		return fmt.Errorf("failed to calculate sighash: %v", err)
+	txOut := &wire.TxOut{
+		PkScript: redeemScript,
+		Value:    amount,
 	}
 
-	fmt.Printf("Sighash (preimage): %x\n", sighash)
+	// Create canned prev output fetcher from OutPoint
+	prevOutputs := map[wire.OutPoint]*wire.TxOut{
+		tx.TxIn[0].PreviousOutPoint: txOut,
+	}
+	prevFetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
 
-	// Sign with Alice and Bob
-	aliceSig := ecdsa.Sign(alicePrivKey, sighash)
+	hashCache := txscript.NewTxSigHashes(tx, prevFetcher)
+
+	sighash1, err := txscript.CalcWitnessSigHash(
+		redeemScript, hashCache, txscript.SigHashAll, tx, 0, amount,
+	)
+	if err != nil {
+		return fmt.Errorf("failed sighash1: %v", err)
+	}
+	aliceSig := ecdsa.Sign(alicePrivKey, sighash1)
 	aliceSigBytes := append(aliceSig.Serialize(), byte(txscript.SigHashAll))
 
-	bobSig := ecdsa.Sign(bobPrivKey, sighash)
+	sighash2, err := txscript.CalcWitnessSigHash(
+		redeemScript, hashCache, txscript.SigHashAll, tx, 0, amount,
+	)
+	if err != nil {
+		return fmt.Errorf("failed sighash2: %v", err)
+	}
+	bobSig := ecdsa.Sign(bobPrivKey, sighash2)
 	bobSigBytes := append(bobSig.Serialize(), byte(txscript.SigHashAll))
 
-	// Build final scriptSig
-	scriptSig, err := txscript.NewScriptBuilder().
-		AddOp(txscript.OP_0).
-		AddData(aliceSigBytes).
-		AddData(bobSigBytes).
-		AddData(redeemScript).
-		Script()
-	if err != nil {
-		return fmt.Errorf("failed to build scriptSig: %v", err)
+	tx.TxIn[0].SignatureScript = nil
+	tx.TxIn[0].Witness = wire.TxWitness{
+		{},            // Dummy for multisig OP_0
+		aliceSigBytes, // Signature 1
+		bobSigBytes,   // Signature 2
+		redeemScript,  // Redeem script (2-of-2)
 	}
 
-	tx.TxIn[0].SignatureScript = scriptSig
-
-	// Serialize final tx
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
 	finalHex := hex.EncodeToString(buf.Bytes())
 
-	fmt.Println("Signed Commitment Tx:", finalHex)
+	fmt.Println("\n✅ Signed SegWit Commitment Tx:")
+	fmt.Println(finalHex)
+
 	return os.WriteFile("data/commit-signed.txt", []byte(finalHex), 0644)
 }

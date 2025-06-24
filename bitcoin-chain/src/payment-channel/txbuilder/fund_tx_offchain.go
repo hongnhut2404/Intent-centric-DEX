@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -41,8 +42,9 @@ func FundMultisigFromBobOffchain(statePath string) error {
 	}
 	privBytes, _ := hex.DecodeString(state.Bob.PrivKey)
 	privKey, _ := btcec.PrivKeyFromBytes(privBytes)
+	pubKey := privKey.PubKey()
 
-	// Load Bob's UTXO
+	// Load UTXO
 	utxoRaw, err := os.ReadFile("data/bob-utxo.json")
 	if err != nil {
 		return fmt.Errorf("missing bob-utxo.json: %v", err)
@@ -55,23 +57,22 @@ func FundMultisigFromBobOffchain(statePath string) error {
 		return fmt.Errorf("no unspents found")
 	}
 	utxo := file.Unspents[0]
-	fmt.Println(utxo.Amount)
-	fmt.Println(fund.Amount)
 	amountIn := int64(utxo.Amount * 1e8)
 	amountOut := int64(fund.Amount * 1e8)
-	fee := int64(500) // fixed fee
+	fee := int64(500)
 
 	if amountIn < amountOut+fee {
 		return fmt.Errorf("insufficient balance (need %d, have %d)", amountOut+fee, amountIn)
 	}
 
+	// Construct transaction
 	tx := wire.NewMsgTx(wire.TxVersion)
 	txHash, _ := chainhash.NewHashFromStr(utxo.Txid)
 	outPoint := wire.NewOutPoint(txHash, utxo.Vout)
 	txIn := wire.NewTxIn(outPoint, nil, nil)
 	tx.AddTxIn(txIn)
 
-	// Output to multisig
+	// Output to multisig address
 	addr, err := btcutil.DecodeAddress(fund.Address, &chaincfg.RegressionNetParams)
 	if err != nil {
 		return fmt.Errorf("invalid multisig address: %v", err)
@@ -80,29 +81,62 @@ func FundMultisigFromBobOffchain(statePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create output script: %v", err)
 	}
-	txOut := wire.NewTxOut(amountOut, script)
-	tx.AddTxOut(txOut)
+	tx.AddTxOut(wire.NewTxOut(amountOut, script))
 
 	// Change back to Bob
-	changeAddr, _ := btcutil.DecodeAddress(state.Bob.Address, &chaincfg.RegressionNetParams)
+	changeAddr, err := btcutil.DecodeAddress(state.Bob.Address, &chaincfg.RegressionNetParams)
+	if err != nil {
+		return fmt.Errorf("invalid change address: %v", err)
+	}
 	changeScript, _ := txscript.PayToAddrScript(changeAddr)
 	tx.AddTxOut(wire.NewTxOut(amountIn-amountOut-fee, changeScript))
 
-	scriptPubKey, _ := hex.DecodeString(utxo.ScriptPubKey)
-	sigScript, err := txscript.SignatureScript(
-		tx, 0, scriptPubKey, txscript.SigHashAll, privKey, true,
+	// --- Segwit (P2WPKH) Signing ---
+
+	// Get Bob's pubkey hash
+	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
+	p2wpkhAddr, _ := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.RegressionNetParams)
+	witnessScript, _ := txscript.PayToAddrScript(p2wpkhAddr)
+
+	// Compute sighash
+	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
+		witnessScript,
+		int64(utxo.Amount*1e8),
+	)
+
+	sigHashes := txscript.NewTxSigHashes(tx, prevOutputFetcher)
+
+	sighash, err := txscript.CalcWitnessSigHash(
+		witnessScript,
+		sigHashes,
+		txscript.SigHashAll,
+		tx,
+		0,
+		int64(utxo.Amount*1e8),
 	)
 	if err != nil {
-		return fmt.Errorf("signing error: %v", err)
+		return fmt.Errorf("failed to compute segwit sighash: %v", err)
 	}
-	tx.TxIn[0].SignatureScript = sigScript
 
-	// Serialize transaction (do NOT broadcast)
+	// Sign
+	signature := ecdsa.Sign(privKey, sighash)
+	sigWithHashType := append(signature.Serialize(), byte(txscript.SigHashAll))
+
+	// Set witness (for P2WPKH)
+	tx.TxIn[0].Witness = wire.TxWitness{
+		sigWithHashType,
+		pubKey.SerializeCompressed(),
+	}
+
+	// scriptSig must be empty
+	tx.TxIn[0].SignatureScript = nil
+
+	// Serialize
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
 	txHex := hex.EncodeToString(buf.Bytes())
 
-	fmt.Println("\n📝 Signed raw funding transaction (off-chain):")
+	fmt.Println("\n📝 Signed raw funding transaction (P2WPKH input):")
 	fmt.Println(txHex)
 	_ = os.WriteFile("data/funding-tx-hex.txt", []byte(txHex), 0644)
 	return nil
