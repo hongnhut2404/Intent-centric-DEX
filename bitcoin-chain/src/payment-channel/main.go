@@ -58,6 +58,16 @@ func main() {
 			fmt.Println("HTLC error:", err)
 		}
 
+	case "commit-amount":
+		var bobAmount float64 = 0 // default
+		if len(os.Args) >= 3 {
+			fmt.Sscanf(os.Args[2], "%f", &bobAmount)
+		}
+		err := txbuilder.CreateCommitmentTxWithAmount("data/state.json", bobAmount)
+		if err != nil {
+			fmt.Println("Commitment Tx error:", err)
+		}
+
 	case "commit":
 		err := txbuilder.CreateCommitmentTx("data/state.json")
 		if err != nil {
