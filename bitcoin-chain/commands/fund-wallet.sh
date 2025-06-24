@@ -15,20 +15,17 @@ address=$(cat ./mineraddress.txt)
 initial_height=$(./bin/bitcoin-cli getblockcount)
 
 # 3. Fund sender wallet
-./bin/bitcoin-cli sendtoaddress bcrt1qh3py35f24dfgx0y6uaznfx66vhm88nh93qvpd0 100
+# ./bin/bitcoin-cli sendtoaddress bcrt1qh3py35f24dfgx0y6uaznfx66vhm88nh93qvpd0 100
+bob_address=$(jq -r '.bob.address' ./src/payment-channel/data/state.json)
 
-# 4. Wait for the next block to be mined
-echo "Waiting for the next block..."
-while true; do
-  current_height=$(./bin/bitcoin-cli getblockcount)
-  if [[ "$current_height" -gt "$initial_height" ]]; then
-    echo "New block mined at height: $current_height"
-    break
-  fi
-  sleep 1
-done
+# Confirm it's stored correctly
+echo "Sending to Bob: $bob_address"
+
+# Send 10 BTC to Bob
+./bin/bitcoin-cli sendtoaddress "$bob_address" 100
+./bin/bitcoin-cli generatetoaddress 1 "$address"
 
 # 5. Scan for UTXOs and write to JSON file
-./bin/bitcoin-cli scantxoutset start "[\"addr(bcrt1qh3py35f24dfgx0y6uaznfx66vhm88nh93qvpd0)\"]" > ./data-script/utxo.json
+./bin/bitcoin-cli scantxoutset start "[\"addr($bob_address)\"]" > ./data-script/utxo.json
 
 echo "Send successfully"
