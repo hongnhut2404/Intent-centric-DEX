@@ -173,27 +173,61 @@ tmux kill-session
 
 ## How to setup the payment channel
 ```bash
+# 1. Start tmux session for Bitcoin Core regtest
 cd bitcoin-chain
 mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
 
+# 2. Generate Alice and Bob keys (creates data/state.json)
 cd src/payment-channel
 go run main.go init alice
 go run main.go init bob
 
-cd .. 
-cd ..
+# 3. Fund Bob's wallet from miner
+cd ../..
 tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
-bitcoin-cli scantxoutset start "[\"addr(<bob_address>)\"]" > data/bob-uxto.json
 
+# Optional: generate 1 block to confirm Bob's funds
+bitcoin-cli generate 1
+
+# 4. Go back to payment-channel
 cd src/payment-channel
+
+# 5. Get Bob's UTXO
+bitcoin-cli scantxoutset start "[\"addr(<bob_address_from_state.json>)\"]" > data/bob-utxo.json
+
+# 6. Generate 2-of-2 multisig address (redeemScript and address printed)
 go run main.go multisig
+
+# 7. Fund the multisig address (off-chain tx signed by Bob)
 go run main.go fund-offchain
-bitcoin-cli decoderawtransaction <signed_tx> #Save to the data/state.json
-bitcoin-cli sendrawtransaction <signed_tx>
 
+# 8. Decode the funding transaction to extract `txid` and `vout`
+bitcoin-cli decoderawtransaction <signed_funding_tx>
 
+# 9. Update data/state.json with:
+#  Replace <txid> and <vout> accordingly (make sure amount = 5.0 or whatever was used)
+#  DO NOT broadcast the tx yet!
+#
+# "htlc": {
+#     "txid": "<txid>",  # from decoderawtransaction
+#     "vout": <vout>,
+#     "amount": 5.0,
+#     "redeemScript": "<redeem_script_from_multisig>"
+# }
+
+# 10. Broadcast the funding transaction
+bitcoin-cli sendrawtransaction <signed_funding_tx>
+bitcoin-cli generate 1  # ⚠️ mine a block to confirm the funding tx
+
+# 11. Create commitment transaction (off-chain execution #1)
 go run main.go commit
-go run main.go sign 
+
+# 12. Sign the commitment transaction (2-of-2 multisig signatures)
+go run main.go sign
+
+# 13. Broadcast the commitment tx (simulate settlement)
+go run main.go settle
+bitcoin-cli generate 1
 
 ```
 
