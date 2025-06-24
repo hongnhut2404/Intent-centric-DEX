@@ -13,28 +13,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-type SignState struct {
-	Alice struct {
-		PrivKey string `json:"privkey"`
-		PubKey  string `json:"pubkey"`
-		Address string `json:"address"`
-	} `json:"alice"`
-
-	Bob struct {
-		PrivKey string `json:"privkey"`
-		PubKey  string `json:"pubkey"`
-		Address string `json:"address"`
-	} `json:"bob"`
-
-	HTLC struct {
-		Txid         string  `json:"txid"`
-		Vout         uint32  `json:"vout"`
-		Amount       float64 `json:"amount"`
-		RedeemScript string  `json:"redeemScript"`
-	} `json:"htlc"`
-}
-
-func SignCommitmentTx(statePath string) error {
+func SignCommitmentTx1(statePath string) error {
 	// Load state
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
@@ -46,7 +25,7 @@ func SignCommitmentTx(statePath string) error {
 		return fmt.Errorf("invalid state file: %v", err)
 	}
 
-	// Load unsigned tx
+	// Load unsigned tx from file
 	txHex, err := os.ReadFile("data/commit-unsigned.txt")
 	if err != nil {
 		return fmt.Errorf("failed to read raw commitment tx: %v", err)
@@ -62,7 +41,7 @@ func SignCommitmentTx(statePath string) error {
 		return fmt.Errorf("failed to parse tx: %v", err)
 	}
 
-	// Decode redeem script
+	// Prepare redeem script
 	redeemScript, err := hex.DecodeString(state.HTLC.RedeemScript)
 	if err != nil {
 		return fmt.Errorf("invalid redeem script: %v", err)
@@ -75,27 +54,19 @@ func SignCommitmentTx(statePath string) error {
 	bobPrivKeyBytes, _ := hex.DecodeString(state.Bob.PrivKey)
 	bobPrivKey, _ := btcec.PrivKeyFromBytes(bobPrivKeyBytes)
 
-	// ---- SIGNING ----
-
-	// Clear scriptSig before signing (very important!)
-	tx.TxIn[0].SignatureScript = nil
-
-	// Compute sighash for legacy P2SH input
+	// Compute sighash for input 0
 	sighash, err := txscript.CalcSignatureHash(redeemScript, txscript.SigHashAll, tx, 0)
 	if err != nil {
 		return fmt.Errorf("failed to calculate sighash: %v", err)
 	}
 
-	fmt.Printf("Sighash (preimage): %x\n", sighash)
-
-	// Sign with Alice and Bob
+	// Sign by both parties
 	aliceSig := ecdsa.Sign(alicePrivKey, sighash)
-	aliceSigBytes := append(aliceSig.Serialize(), byte(txscript.SigHashAll))
-
 	bobSig := ecdsa.Sign(bobPrivKey, sighash)
+	aliceSigBytes := append(aliceSig.Serialize(), byte(txscript.SigHashAll))
 	bobSigBytes := append(bobSig.Serialize(), byte(txscript.SigHashAll))
 
-	// Build final scriptSig
+	// Build multisig scriptSig
 	scriptSig, err := txscript.NewScriptBuilder().
 		AddOp(txscript.OP_0).
 		AddData(aliceSigBytes).
@@ -105,10 +76,9 @@ func SignCommitmentTx(statePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to build scriptSig: %v", err)
 	}
-
 	tx.TxIn[0].SignatureScript = scriptSig
 
-	// Serialize final tx
+	// Serialize final signed tx
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
 	finalHex := hex.EncodeToString(buf.Bytes())
