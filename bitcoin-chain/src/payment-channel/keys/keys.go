@@ -12,9 +12,9 @@ import (
 )
 
 type KeyInfo struct {
-	PrivKey string `json:"privkey"` // hex encoded
-	PubKey  string `json:"pubkey"`  // hex encoded (compressed)
-	Address string `json:"address"` // Bech32 P2WPKH regtest
+	PrivKey string `json:"privkey"`
+	PubKey  string `json:"pubkey"`
+	Address string `json:"address"`
 }
 
 type State struct {
@@ -22,31 +22,29 @@ type State struct {
 	Bob   *KeyInfo `json:"bob,omitempty"`
 }
 
-// GenerateAndStoreKeys generates a keypair for Alice or Bob and stores it in the state file
 func GenerateAndStoreKeys(stateFile string, role string) {
 	if role != "alice" && role != "bob" {
 		fmt.Println("Invalid role. Must be 'alice' or 'bob'")
 		return
 	}
 
-	// Generate a new private key
+	// Generate private key
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
-		panic(fmt.Errorf("failed to generate private key: %v", err))
+		panic(err)
 	}
 	pubKey := privKey.PubKey()
 
-	// Create P2WPKH Bech32 address (regtest)
-	pubKeyHash := btcutil.Hash160(pubKey.SerializeCompressed())
-	address, err := btcutil.NewAddressWitnessPubKeyHash(pubKeyHash, &chaincfg.RegressionNetParams)
+	// Generate address for regtest
+	address, err := btcutil.NewAddressPubKey(pubKey.SerializeCompressed(), &chaincfg.RegressionNetParams)
 	if err != nil {
-		panic(fmt.Errorf("failed to generate address: %v", err))
+		panic(err)
 	}
 
 	keyInfo := &KeyInfo{
-		PrivKey: hex.EncodeToString(privKey.Serialize()),          // hex-encoded private key
-		PubKey:  hex.EncodeToString(pubKey.SerializeCompressed()), // compressed pubkey
-		Address: address.EncodeAddress(),                          // bech32 address
+		PrivKey: hex.EncodeToString(privKey.Serialize()),
+		PubKey:  hex.EncodeToString(pubKey.SerializeCompressed()),
+		Address: address.EncodeAddress(),
 	}
 
 	fmt.Printf("Generated %s key:\n", role)
@@ -54,7 +52,7 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 	fmt.Println("Public Key :", keyInfo.PubKey)
 	fmt.Println("Address    :", keyInfo.Address)
 
-	// Load existing state file if present
+	// Load existing state.json if it exists
 	var state State
 	if _, err := os.Stat(stateFile); err == nil {
 		data, err := os.ReadFile(stateFile)
@@ -63,20 +61,20 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 		}
 	}
 
-	// Update state
+	// Update state with new key
 	if role == "alice" {
 		state.Alice = keyInfo
 	} else {
 		state.Bob = keyInfo
 	}
 
-	// Save to file
+	// Save back to state file
 	newData, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
-		panic(fmt.Errorf("failed to marshal state: %v", err))
+		panic(err)
 	}
 
 	if err := os.WriteFile(stateFile, newData, 0644); err != nil {
-		panic(fmt.Errorf("failed to write state file: %v", err))
+		panic(err)
 	}
 }
