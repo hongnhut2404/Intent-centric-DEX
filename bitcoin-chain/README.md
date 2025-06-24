@@ -171,14 +171,29 @@ tmux kill-session
 ### Bitcoin
 - Still implemted the amount of BTC in hard code -> need to change into reading the amount from json files
 
+## How to setup the payment channel
+```bash
+cd bitcoin-chain
+mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
 
+cd src/payment-channel
 go run main.go init alice
 go run main.go init bob
+
+cd .. 
+cd ..
+tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
+bitcoin-cli scantxoutset start "[\"addr(<bob_address>)\"]" > data/bob-uxto.json
+
+cd src/payment-channel
 go run main.go multisig
-go run main.go htlc <sha256(secret)> 1700000000
-go run main.go fund
+go run main.go fund-offchain
+bitcoin-cli decoderawtransaction <signed_tx> #Save to the data/state.json
+bitcoin-cli sendrawtransaction <signed_tx>
+
+
 go run main.go commit
-go run main.go sign <preimage>
-go run main.go settle
-# After timeout
-go run main.go refund
+go run main.go sign 
+
+```
+
