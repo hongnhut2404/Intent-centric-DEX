@@ -173,6 +173,8 @@ tmux kill-session
 
 ## How to setup the payment channel
 ```bash
+# 0. Remove the current data folder
+
 # 1. Start tmux session for Bitcoin Core regtest
 cd bitcoin-chain
 mux start -p ../.tmuxinator/bitcoin-chain-execute.yml

@@ -1,0 +1,113 @@
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain$ ./commands/panel3.sh                                                                  
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain$ cd src/payment-channel                                                                
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go init alice                                         
+Generated alice key:                                                                                                                            
+Private Key: c9ad38e952cfadf29cf1cf0ca5f5c048b01b4efa4a85ff8cf5e8a8d276710599                                                                   
+Public Key : 023b6f7255d0192194e6d25b27c95040980954462d92f51a4722a23a791748e2fb                                                                 
+Address    : miQTFDu54A4cMEPtR1JUbEkVSWTDkBHWk8                                                                                                 
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go init bob                                           
+Generated bob key:                                                                                                                              
+Private Key: 3fc3379b9efdb506f90b33ee22eb78a69c7864916fcf52109f373d308cd52657                                                                   
+Public Key : 037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee6920                                                                 
+Address    : mtbrjt6Ln1z7ZNX2zf5AKE2rs8bhHdLjuW                                                                                                 
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ cd ../..                                                          
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain$ tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m        
+./commands/fund-wallet.sh                                                                                                                       
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain$ ./commands/fund-wallet.sh 
+
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain$ cd src/payment-channel
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ bitcoin-cli scantxoutset start "[\"addr(mtbrjt6Ln1z7ZNX2zf5AKE2rs8
+bhHdLjuW)\"]" > data/bob-utxo.json
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go multisig
+Redeem Script: 5221023b6f7255d0192194e6d25b27c95040980954462d92f51a4722a23a791748e2fb21037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c024
+3c4ee692052ae
+P2SH Address : 2N3EQ1awx8gQczcShWB1bkUCs1skSYVPVDX
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go fund-offchain
+Off-chain funding error: failed to read fund.json: open data/fund.json: no such file or directory
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go fund-offchain
+100                                                                                                                                             
+10                                                                                                                                              
+
+📝 Signed raw funding transaction (off-chain):
+0100000001677bd36b46c4e3ca114437eedd7d9328438fd1c24075c9d69000044486319235000000006a47304402206c9ab57720d2e2db6c3b4f5d342e6294307f8132440d020847
+0892ea318400b902200bc53ac6640c8c4a75d83b08eb05d51618b3b4f8fb18975edd4c02fa8c87432b0121037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243
+c4ee6920ffffffff0200ca9a3b0000000017a9146d89354c63976aab042abb5dd90f4a3dc0aadd9c870c187118020000001976a9148f8714031867851d39ad2a40c583c98a826ac3
+4788ac00000000
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ bitcoin-cli decoderawtransaction 0100000001677bd36b46c4e3ca114437e
+edd7d9328438fd1c24075c9d69000044486319235000000006a47304402206c9ab57720d2e2db6c3b4f5d342e6294307f8132440d0208470892ea318400b902200bc53ac6640c8c4
+a75d83b08eb05d51618b3b4f8fb18975edd4c02fa8c87432b0121037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee6920ffffffff0200ca9a3b0000000
+017a9146d89354c63976aab042abb5dd90f4a3dc0aadd9c870c187118020000001976a9148f8714031867851d39ad2a40c583c98a826ac34788ac00000000
+{                                                                                                                                               
+  "txid": "1a668a114b0f35293b6b1c4fe2520e55216e9ad35f5acfb26b3f411f3941b81b",                                                                   
+  "hash": "1a668a114b0f35293b6b1c4fe2520e55216e9ad35f5acfb26b3f411f3941b81b",
+  "version": 1,
+  "size": 223,
+  "vsize": 223,
+  "weight": 892,
+  "locktime": 0,
+  "vin": [
+    {
+      "txid": "3592318644040090d6c97540c2d18f4328937dddee374411cae3c4466bd37b67",
+      "vout": 0,
+      "scriptSig": {
+        "asm": "304402206c9ab57720d2e2db6c3b4f5d342e6294307f8132440d0208470892ea318400b902200bc53ac6640c8c4a75d83b08eb05d51618b3b4f8fb18975edd4c
+02fa8c87432b[ALL] 037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee6920",
+        "hex": "47304402206c9ab57720d2e2db6c3b4f5d342e6294307f8132440d0208470892ea318400b902200bc53ac6640c8c4a75d83b08eb05d51618b3b4f8fb18975edd
+4c02fa8c87432b0121037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee6920"
+      },
+      "sequence": 4294967295
+      ],                                                                                                                           14:12:54 [36/236]
+  "vout": [
+    {
+      "value": 10.00000000,
+      "n": 0,
+      "scriptPubKey": {
+        "asm": "OP_HASH160 6d89354c63976aab042abb5dd90f4a3dc0aadd9c OP_EQUAL",
+        "desc": "addr(2N3EQ1awx8gQczcShWB1bkUCs1skSYVPVDX)#dkhgh4qe",
+        "hex": "a9146d89354c63976aab042abb5dd90f4a3dc0aadd9c87",
+        "address": "2N3EQ1awx8gQczcShWB1bkUCs1skSYVPVDX",
+        "type": "scripthash"
+      }
+    },
+    {
+      "value": 89.99999500,
+      "n": 1,
+      "scriptPubKey": {
+        "asm": "OP_DUP OP_HASH160 8f8714031867851d39ad2a40c583c98a826ac347 OP_EQUALVERIFY OP_CHECKSIG",
+        "desc": "addr(mtbrjt6Ln1z7ZNX2zf5AKE2rs8bhHdLjuW)#n74v3vhs",
+        "hex": "76a9148f8714031867851d39ad2a40c583c98a826ac34788ac",
+        "address": "mtbrjt6Ln1z7ZNX2zf5AKE2rs8bhHdLjuW",
+        "type": "pubkeyhash"
+      }
+    }
+  ]
+}
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ bitcoin-cli sendrawtransaction 0100000001677bd36b46c4e3ca114437eed
+d7d9328438fd1c24075c9d69000044486319235000000006a47304402206c9ab57720d2e2db6c3b4f5d342e6294307f8132440d0208470892ea318400b902200bc53ac6640c8c4a7
+5d83b08eb05d51618b3b4f8fb18975edd4c02fa8c87432b0121037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee6920ffffffff0200ca9a3b000000001
+7a9146d89354c63976aab042abb5dd90f4a3dc0aadd9c870c187118020000001976a9148f8714031867851d39ad2a40c583c98a826ac34788ac00000000
+1a668a114b0f35293b6b1c4fe2520e55216e9ad35f5acfb26b3f411f3941b81b
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go commit
+Unsigned Commitment Transaction (hex): 01000000011bb841391f413f6bb2cf5a5fd39a6e21550e52e24f1c6b3b29350f4b118a661a0000000000ffffffff010cc89a3b000
+000001976a9141fada202f039d51ceddb17149d9775bdd60538e588ac00000000
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go sign
+Sighash (preimage): 6937f22103396fc271d8d08b071a5e7643e9ae781783228cf5a6430971a1e56e
+Signed Commitment Tx: 01000000011bb841391f413f6bb2cf5a5fd39a6e21550e52e24f1c6b3b29350f4b118a661a00000000db0048304502210096d89f833a1c166d77fab405
+8f74aa0ee8c56fcac867cdc8fd9c597f6ea69e04022033b121c1b0b465c12ce2eb6404525f675ad21d5aa6be95240211129b7ae2c856014830450221008354ec8be80d5237e3740d
+f7358f0c561ca72d83e5e753255c06691aa97a51bc02207590f0d761a230fd7bd6a3aa82b823a5029f32d2867ca4ea52b23b7aa9c1dc2201475221023b6f7255d0192194e6d25b27
+c95040980954462d92f51a4722a23a791748e2fb21037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee692052aeffffffff010cc89a3b000000001976a9
+141fada202f039d51ceddb17149d9775bdd60538e588ac00000000
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ go run main.go settle
+Use bitcoin-cli to send this tx:
+bitcoin-cli sendrawtransaction 01000000011bb841391f413f6bb2cf5a5fd39a6e21550e52e24f1c6b3b29350f4b118a661a00000000db0048304502210096d89f833a1c166
+d77fab4058f74aa0ee8c56fcac867cdc8fd9c597f6ea69e04022033b121c1b0b465c12ce2eb6404525f675ad21d5aa6be95240211129b7ae2c856014830450221008354ec8be80d5
+237e3740df7358f0c561ca72d83e5e753255c06691aa97a51bc02207590f0d761a230fd7bd6a3aa82b823a5029f32d2867ca4ea52b23b7aa9c1dc2201475221023b6f7255d019219
+4e6d25b27c95040980954462d92f51a4722a23a791748e2fb21037173e1766eed964ab215262d87e8961c65031625a1ba3a34815c0243c4ee692052aeffffffff010cc89a3b00000
+0001976a9141fada202f039d51ceddb17149d9775bdd60538e588ac00000000
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ ^C
+nhutthi@192:~/Documents/Intent-centric-DEX/bitcoin-chain/src/payment-channel$ bitcoin-cli sendrawtransaction 01000000011bb841391f413f6bb2cf5a5fd
+39a6e21550e52e24f1c6b3b29350f4b118a661a00000000db0048304502210096d89f833a1c166d77fab4058f74aa0ee8c56fcac867cdc8fd9c597f6ea69e04022033b121c1b0b46
+5c12ce2eb6404525f675ad21d5aa6be95240211129b7ae2c856014830450221008354ec8be80d5237e3740df7358f0c561ca72d83e5e753255c06691aa97a51bc02207590f0d761a
+230fd7bd6a3aa82b823a5029f32d2867ca4ea52b23b7aa9c1dc2201475221023b6f7255d0192194e6d25b27c95040980954462d92f51a4722a23a791748e2fb21037173e1766eed9
+64ab215262d87e8961c65031625a1ba3a34815c0243c4ee692052aeffffffff010cc89a3b000000001976a9141fada202f039d51ceddb17149d9775bdd60538e588ac00000000
+4f11f029434d2fa7327b38068a7544f5ae84040f75d029a0621cecf069288e5a
