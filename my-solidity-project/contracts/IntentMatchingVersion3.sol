@@ -222,11 +222,11 @@ contract IntentMatchingVersion3 is Ownable, ReentrancyGuard, Pausable {
 
     // Match a single buy intent
     function matchIntent(uint256 buyIntentId) external nonReentrant whenNotPaused returns (bool) {
-            return matchSingleIntent(buyIntentId);
-        }
+        return matchSingleIntent(buyIntentId);
+    }
 
         // Match a single sell intent with buy intents
-        function matchSellIntent(uint256 sellIntentId) external nonReentrant whenNotPaused returns (bool) {
+    function matchSellIntent(uint256 sellIntentId) external nonReentrant whenNotPaused returns (bool) {
         SellIntent storage sell = sellIntents[sellIntentId];
         require(sell.status == IntentStatus.Pending, "Sell intent not pending");
         require(block.timestamp <= sell.deadline, "Sell intent expired");
