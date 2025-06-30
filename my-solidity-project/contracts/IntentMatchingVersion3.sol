@@ -122,47 +122,6 @@ contract IntentMatchingVersion3 is Ownable, ReentrancyGuard, Pausable {
         return intentId;
     }
 
-    // Helper function to execute a single trade
-    // function executeTrade(
-    //     BuyIntent storage buy,
-    //     SellIntent storage sell,
-    //     uint256 buyIntentId,
-    //     uint256 sellIntentId,
-    //     uint256 amountOut
-    // ) internal {
-    //     uint256 requiredAmountIn = (amountOut * buy.amountIn) / buy.minAmountOut;
-
-    //     require(buy.tokenIn.balanceOf(buy.user) >= requiredAmountIn, "Insufficient buyer balance");
-    //     require(sell.tokenIn.balanceOf(sell.user) >= amountOut, "Insufficient seller balance");
-
-    //     buy.tokenIn.transferFrom(buy.user, sell.user, requiredAmountIn);
-    //     sell.tokenIn.transferFrom(sell.user, buy.user, amountOut);
-
-    //     sell.amountIn -= amountOut;
-    //     sell.minAmountOut = sell.amountIn > 0 ? (sell.minAmountOut * sell.amountIn) / (sell.amountIn + amountOut) : 0;
-    //     if (sell.amountIn == 0) {
-    //         sell.status = IntentStatus.Filled;
-    //         userIntentCount[sell.user]--;
-    //     }
-
-    //     buy.amountIn -= requiredAmountIn;
-    //     buy.minAmountOut -= amountOut;
-    //     if (buy.amountIn == 0) {
-    //         buy.status = IntentStatus.Filled;
-    //         userIntentCount[buy.user]--;
-    //     }
-
-    //     emit TradeExecuted(
-    //         buyIntentId,
-    //         sellIntentId,
-    //         msg.sender,
-    //         address(buy.tokenIn),
-    //         address(buy.tokenOut),
-    //         requiredAmountIn,
-    //         amountOut
-    //     );
-    // }
-
     function executeTrade(
         BuyIntent storage buy,
         SellIntent storage sell,
