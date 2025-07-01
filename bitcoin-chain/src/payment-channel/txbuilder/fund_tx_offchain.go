@@ -19,7 +19,36 @@ type UTXOFile struct {
 	Unspents []BobUTXO `json:"unspents"`
 }
 
-func FundMultisigFromBobOffchain(statePath string) error {
+func UpdateFund(amount float64) error {
+	// Load fund destination
+	fundRaw, err := os.ReadFile("data/fund.json")
+	if err != nil {
+		return fmt.Errorf("failed to read fund.json: %v", err)
+	}
+	var fund FundData
+	if err := json.Unmarshal(fundRaw, &fund); err != nil {
+		return fmt.Errorf("invalid fund.json: %v", err)
+	}
+
+	// Override amount with input parameter
+	fund.Amount = amount
+
+	// Optionally store it back to fund.json
+	fundBytes, err := json.MarshalIndent(fund, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated fund.json: %v", err)
+	}
+	if err := os.WriteFile("data/fund.json", fundBytes, 0644); err != nil {
+		return fmt.Errorf("failed to update fund.json: %v", err)
+	}
+	fmt.Println("Updated fund.json with amount:", amount)
+	return nil
+}
+
+func FundMultisigFromBobOffchain(statePath string, amount float64) error {
+	// Update json
+	UpdateFund(amount)
+
 	// Load fund destination
 	fundRaw, err := os.ReadFile("data/fund.json")
 	if err != nil {

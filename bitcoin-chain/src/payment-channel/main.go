@@ -74,16 +74,6 @@ func main() {
 			fmt.Println("Commitment Tx error:", err)
 		}
 
-		// case "sign":
-		// 	if len(os.Args) < 3 {
-		// 		fmt.Println("Usage: go run main.go sign <secret>")
-		// 		return
-		// 	}
-		// 	preimage := os.Args[2]
-		// 	err := txbuilder.SignCommitmentTx("data/state.json", preimage)
-		// 	if err != nil {
-		// 		fmt.Println("Sign error:", err)
-		// 	}
 	case "sign":
 		err := txbuilder.SignCommitmentTx("data/state.json")
 		if err != nil {
@@ -106,7 +96,15 @@ func main() {
 			fmt.Println("Refund error:", err)
 		}
 	case "fund-offchain":
-		err := txbuilder.FundMultisigFromBobOffchain("data/state.json")
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: go run main.go fund-offchain <amount>")
+			return
+		}
+		amountStr := os.Args[2]
+		var amount float64
+		fmt.Sscanf(amountStr, "%f", &amount)
+
+		err := txbuilder.FundMultisigFromBobOffchain("data/state.json", amount)
 		if err != nil {
 			fmt.Println("Off-chain funding error:", err)
 		}

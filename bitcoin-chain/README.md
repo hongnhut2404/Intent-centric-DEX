@@ -188,9 +188,6 @@ go run main.go init bob
 cd ../..
 tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 
-# Optional: generate 1 block to confirm Bob's funds
-bitcoin-cli generate 1
-
 # 4. Go back to payment-channel
 cd src/payment-channel
 
@@ -211,15 +208,14 @@ bitcoin-cli decoderawtransaction <signed_funding_tx>
 #  DO NOT broadcast the tx yet!
 #
 # "htlc": {
-#     "txid": "<txid>",  # from decoderawtransaction
-#     "vout": <vout>,
+#     "txid": "86d9b008ed03e37c9ab0b649e60c2bf8a72c7801f0d4a3ad3ef0afe39393547f",  # from decoderawtransaction
+#     "vout": 0,
 #     "amount": 5.0,
-#     "redeemScript": "<redeem_script_from_multisig>"
+#     "redeemScript": "<deem_scripret_from_multisig>"
 # }
 
 # 10. Broadcast the funding transaction
 bitcoin-cli sendrawtransaction <signed_funding_tx>
-bitcoin-cli generate 1  # ⚠️ mine a block to confirm the funding tx
 
 # 11. Create commitment transaction (off-chain execution #1)
 go run main.go commit

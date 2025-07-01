@@ -17,6 +17,10 @@ type KeyInfo struct {
 	Address string `json:"address"`
 }
 
+type FundData struct {
+	Address string `json:"address"`
+}
+
 type State struct {
 	Alice *KeyInfo `json:"alice"`
 	Bob   *KeyInfo `json:"bob"`
@@ -75,6 +79,20 @@ func GenerateMultisig(stateFile string) (string, string, error) {
 	redeemScriptHex := hex.EncodeToString(redeemScript)
 	fmt.Println("Redeem Script:", redeemScriptHex)
 	fmt.Println("P2SH Address :", address.EncodeAddress())
+
+	// Save to fund.json
+	fund := FundData{
+		Address: address.EncodeAddress(),
+	}
+	fundBytes, err := json.MarshalIndent(fund, "", "  ")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal fund.json: %v", err)
+	}
+	err = os.WriteFile("data/fund.json", fundBytes, 0644)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to write fund.json: %v", err)
+	}
+	fmt.Println("Saved fund.json with P2SH address")
 
 	return redeemScriptHex, address.EncodeAddress(), nil
 }
