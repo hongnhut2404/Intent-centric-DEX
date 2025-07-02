@@ -202,7 +202,7 @@ go run main.go fund-offchain 10
 
 # 8. Decode the funding transaction to extract `txid` and `vout`
 bitcoin-cli decoderawtransaction <signed_funding_tx>
-txbuilder.UpdateHTLCTx("data/state.json", "abc123...", 0)
+go run main.go set-htlc-tx 9ff1910c7d857a7e887ffc3f87b53f6a388c678d2e573ae929e54dfdcec0f320 0
 
 # 9. Update data/state.json with:
 #  Replace <txid> and <vout> accordingly (make sure amount = 5.0 or whatever was used)
@@ -217,6 +217,8 @@ txbuilder.UpdateHTLCTx("data/state.json", "abc123...", 0)
 
 # 10. Broadcast the funding transaction
 bitcoin-cli sendrawtransaction <signed_funding_tx>
+
+01000000013366e5050da8164a512e2a032d71e135e186fd05e93166335dcdd4016d7a6316010000006a47304402205d3ccf89612dfdb3b34efdb45f54f2a8c257e51034583b6fb2193ab7ce41c5d402202c78c7de32b84d13532146deadbb38c7d77e0cf098ba884454fd4e403596c9990121035e245a559f5c7dbd808087cae8945eafd90ca8faa38910774756d6fe89cded75ffffffff0200ca9a3b0000000017a914e2800973d6bfc7a0450dca0ebb54761d8fd16d27870c187118020000001976a9140891fd47746926669c6b96bbfea0e7d8893736e388ac00000000
 
 # 11. Create commitment transaction (off-chain execution #1)
 go run main.go commit

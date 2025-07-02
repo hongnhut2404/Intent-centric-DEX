@@ -108,6 +108,19 @@ func main() {
 		if err != nil {
 			fmt.Println("Off-chain funding error:", err)
 		}
+	case "set-htlc-tx":
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: go run main.go set-htlc-tx <txid> <vout>")
+			return
+		}
+		txid := os.Args[2]
+		var vout uint32
+		fmt.Sscanf(os.Args[3], "%d", &vout)
+
+		err := txbuilder.UpdateHTLCTx("data/state.json", txid, vout)
+		if err != nil {
+			fmt.Println("Error updating HTLC txid/vout:", err)
+		}
 
 	default:
 		fmt.Println("Unknown command:", cmd)

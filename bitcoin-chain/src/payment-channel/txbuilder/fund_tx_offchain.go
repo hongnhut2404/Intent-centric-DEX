@@ -22,6 +22,9 @@ type UTXOFile struct {
 func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	// Update json
 	UpdateFund(amount)
+	if err := UpdateHTLCAmount(statePath, amount); err != nil {
+		return fmt.Errorf("failed to update HTLC amount in state.json: %v", err)
+	}
 
 	// Load fund destination
 	fundRaw, err := os.ReadFile("data/fund.json")

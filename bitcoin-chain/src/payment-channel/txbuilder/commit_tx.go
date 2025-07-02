@@ -22,7 +22,7 @@ type KeyInfo struct {
 
 type HTLC struct {
 	Txid         string  `json:"txid,omitempty"`
-	Vout         uint32  `json:"vout,omitempty"`
+	Vout         uint32  `json:"vout"`
 	Amount       float64 `json:"amount,omitempty"`
 	RedeemScript string  `json:"redeemScript,omitempty"`
 }
