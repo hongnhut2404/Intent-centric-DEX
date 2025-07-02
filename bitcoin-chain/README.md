@@ -198,10 +198,11 @@ bitcoin-cli scantxoutset start "[\"addr(<bob_address_from_state.json>)\"]" > dat
 go run main.go multisig
 
 # 7. Fund the multisig address (off-chain tx signed by Bob)
-go run main.go fund-offchain
+go run main.go fund-offchain 10
 
 # 8. Decode the funding transaction to extract `txid` and `vout`
 bitcoin-cli decoderawtransaction <signed_funding_tx>
+txbuilder.UpdateHTLCTx("data/state.json", "abc123...", 0)
 
 # 9. Update data/state.json with:
 #  Replace <txid> and <vout> accordingly (make sure amount = 5.0 or whatever was used)

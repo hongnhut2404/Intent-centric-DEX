@@ -74,6 +74,12 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 		panic(err)
 	}
 
+	// Ensure directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		panic(fmt.Errorf("failed to create data directory: %v", err))
+	}
+
+	// then save
 	if err := os.WriteFile(stateFile, newData, 0644); err != nil {
 		panic(err)
 	}

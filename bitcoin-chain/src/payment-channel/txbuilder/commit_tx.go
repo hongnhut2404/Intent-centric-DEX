@@ -20,25 +20,17 @@ type KeyInfo struct {
 	Address string `json:"address"`
 }
 
+type HTLC struct {
+	Txid         string  `json:"txid,omitempty"`
+	Vout         uint32  `json:"vout,omitempty"`
+	Amount       float64 `json:"amount,omitempty"`
+	RedeemScript string  `json:"redeemScript,omitempty"`
+}
+
 type State struct {
-	Alice struct {
-		PrivKey string `json:"privkey"`
-		PubKey  string `json:"pubkey"`
-		Address string `json:"address"`
-	} `json:"alice"`
-
-	Bob struct {
-		PrivKey string `json:"privkey"`
-		PubKey  string `json:"pubkey"`
-		Address string `json:"address"`
-	} `json:"bob"`
-
-	HTLC struct {
-		Txid         string  `json:"txid"`
-		Vout         uint32  `json:"vout"`
-		Amount       float64 `json:"amount"`
-		RedeemScript string  `json:"redeemScript"`
-	} `json:"htlc"`
+	Alice *KeyInfo `json:"alice"`
+	Bob   *KeyInfo `json:"bob"`
+	HTLC  *HTLC    `json:"htlc,omitempty"`
 }
 
 func CreateCommitmentTx(stateFile string) error {

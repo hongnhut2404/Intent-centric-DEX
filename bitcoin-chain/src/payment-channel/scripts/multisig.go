@@ -21,9 +21,28 @@ type FundData struct {
 	Address string `json:"address"`
 }
 
+type HTLC struct {
+	Txid         string  `json:"txid,omitempty"`
+	Vout         uint32  `json:"vout,omitempty"`
+	Amount       float64 `json:"amount,omitempty"`
+	RedeemScript string  `json:"redeemScript,omitempty"`
+}
+
 type State struct {
 	Alice *KeyInfo `json:"alice"`
 	Bob   *KeyInfo `json:"bob"`
+	HTLC  *HTLC    `json:"htlc,omitempty"`
+}
+
+func SaveState(stateFile string, state *State) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal state: %v", err)
+	}
+	if err := os.WriteFile(stateFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %v", stateFile, err)
+	}
+	return nil
 }
 
 func GenerateMultisig(stateFile string) (string, string, error) {
@@ -93,6 +112,17 @@ func GenerateMultisig(stateFile string) (string, string, error) {
 		return "", "", fmt.Errorf("failed to write fund.json: %v", err)
 	}
 	fmt.Println("Saved fund.json with P2SH address")
+
+	// Save redeemScript to state.json as well
+	if state.HTLC == nil {
+		state.HTLC = &HTLC{}
+	}
+	state.HTLC.RedeemScript = redeemScriptHex
+
+	// Save state.json with helper
+	if err := SaveState(stateFile, &state); err != nil {
+		return "", "", fmt.Errorf("failed to save state: %v", err)
+	}
 
 	return redeemScriptHex, address.EncodeAddress(), nil
 }

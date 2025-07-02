@@ -19,32 +19,6 @@ type UTXOFile struct {
 	Unspents []BobUTXO `json:"unspents"`
 }
 
-func UpdateFund(amount float64) error {
-	// Load fund destination
-	fundRaw, err := os.ReadFile("data/fund.json")
-	if err != nil {
-		return fmt.Errorf("failed to read fund.json: %v", err)
-	}
-	var fund FundData
-	if err := json.Unmarshal(fundRaw, &fund); err != nil {
-		return fmt.Errorf("invalid fund.json: %v", err)
-	}
-
-	// Override amount with input parameter
-	fund.Amount = amount
-
-	// Optionally store it back to fund.json
-	fundBytes, err := json.MarshalIndent(fund, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated fund.json: %v", err)
-	}
-	if err := os.WriteFile("data/fund.json", fundBytes, 0644); err != nil {
-		return fmt.Errorf("failed to update fund.json: %v", err)
-	}
-	fmt.Println("Updated fund.json with amount:", amount)
-	return nil
-}
-
 func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	// Update json
 	UpdateFund(amount)
@@ -84,8 +58,6 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 		return fmt.Errorf("no unspents found")
 	}
 	utxo := file.Unspents[0]
-	fmt.Println(utxo.Amount)
-	fmt.Println(fund.Amount)
 	amountIn := int64(utxo.Amount * 1e8)
 	amountOut := int64(fund.Amount * 1e8)
 	fee := int64(500) // fixed fee
@@ -131,7 +103,7 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	tx.Serialize(&buf)
 	txHex := hex.EncodeToString(buf.Bytes())
 
-	fmt.Println("\n📝 Signed raw funding transaction (off-chain):")
+	fmt.Println("\nSigned raw funding transaction (off-chain):")
 	fmt.Println(txHex)
 	_ = os.WriteFile("data/funding-tx-hex.txt", []byte(txHex), 0644)
 	return nil
