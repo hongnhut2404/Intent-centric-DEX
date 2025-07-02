@@ -15,24 +15,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-type BobUTXO struct {
-	Txid         string  `json:"txid"`
-	Vout         uint32  `json:"vout"`
-	Amount       float64 `json:"amount"`
-	ScriptPubKey string  `json:"scriptPubKey"`
-}
-
-type FundData struct {
-	Address string  `json:"address"`
-	Amount  float64 `json:"amount"`
-}
-
-type BobKey struct {
-	PrivKey string `json:"privkey"`
-	PubKey  string `json:"pubkey"`
-	Address string `json:"address"`
-}
-
 func FundMultisigFromBob(statePath string) error {
 	// Load fund destination
 	fundRaw, err := os.ReadFile("data/fund.json")

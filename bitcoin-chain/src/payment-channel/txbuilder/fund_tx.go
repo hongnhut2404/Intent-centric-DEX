@@ -8,18 +8,6 @@ import (
 	"example.com/m/utils"
 )
 
-type FundInput struct {
-	Address string  `json:"address"`
-	Amount  float64 `json:"amount"`
-}
-
-type UTXORecord struct {
-	TxID         string  `json:"txid"`
-	Vout         uint32  `json:"vout"`
-	Amount       float64 `json:"amount"`
-	RedeemScript string  `json:"redeemScript,omitempty"` // filled later
-}
-
 func FundChannel(statePath string) {
 	// Load funding data
 	raw, err := os.ReadFile("data/fund.json")

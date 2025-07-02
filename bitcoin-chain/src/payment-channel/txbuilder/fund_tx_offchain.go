@@ -15,8 +15,36 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-type UTXOFile struct {
-	Unspents []BobUTXO `json:"unspents"`
+func InitChannelState(statePath string, bobFundAmount float64) error {
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %v", statePath, err)
+	}
+
+	var state State
+	if err := json.Unmarshal(data, &state); err != nil {
+		return fmt.Errorf("failed to parse %s: %v", statePath, err)
+	}
+
+	if state.Channel == nil {
+		state.Channel = &ChannelState{
+			AliceBalance: 0,
+			BobBalance:   bobFundAmount,
+		}
+		fmt.Printf("Initialized channel balances: Alice=0 BTC, Bob=%.8f BTC\n", bobFundAmount)
+
+		updated, err := json.MarshalIndent(state, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal updated state: %v", err)
+		}
+		if err := os.WriteFile(statePath, updated, 0644); err != nil {
+			return fmt.Errorf("failed to write updated state: %v", err)
+		}
+	} else {
+		fmt.Println("ChannelState already exists, skipping initialization.")
+	}
+
+	return nil
 }
 
 func FundMultisigFromBobOffchain(statePath string, amount float64) error {
@@ -109,5 +137,10 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	fmt.Println("\nSigned raw funding transaction (off-chain):")
 	fmt.Println(txHex)
 	_ = os.WriteFile("data/funding-tx-hex.txt", []byte(txHex), 0644)
+
+	if err := InitChannelState(statePath, amount); err != nil {
+		return fmt.Errorf("failed to initialize ChannelState: %v", err)
+	}
+
 	return nil
 }
