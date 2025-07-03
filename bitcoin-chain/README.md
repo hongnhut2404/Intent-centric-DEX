@@ -205,15 +205,7 @@ bitcoin-cli decoderawtransaction <signed_funding_tx>
 go run main.go set-htlc-tx 9ff1910c7d857a7e887ffc3f87b53f6a388c678d2e573ae929e54dfdcec0f320 0
 
 # 9. Update data/state.json with:
-#  Replace <txid> and <vout> accordingly (make sure amount = 5.0 or whatever was used)
-#  DO NOT broadcast the tx yet!
-#
-# "htlc": {
-#     "txid": "86d9b008ed03e37c9ab0b649e60c2bf8a72c7801f0d4a3ad3ef0afe39393547f",  # from decoderawtransaction
-#     "vout": 0,
-#     "amount": 5.0,
-#     "redeemScript": "<deem_scripret_from_multisig>"
-# }
+
 
 # 10. Broadcast the funding transaction
 bitcoin-cli sendrawtransaction <signed_funding_tx>
@@ -221,7 +213,12 @@ bitcoin-cli sendrawtransaction <signed_funding_tx>
 01000000013366e5050da8164a512e2a032d71e135e186fd05e93166335dcdd4016d7a6316010000006a47304402205d3ccf89612dfdb3b34efdb45f54f2a8c257e51034583b6fb2193ab7ce41c5d402202c78c7de32b84d13532146deadbb38c7d77e0cf098ba884454fd4e403596c9990121035e245a559f5c7dbd808087cae8945eafd90ca8faa38910774756d6fe89cded75ffffffff0200ca9a3b0000000017a914e2800973d6bfc7a0450dca0ebb54761d8fd16d27870c187118020000001976a9140891fd47746926669c6b96bbfea0e7d8893736e388ac00000000
 
 # 11. Create commitment transaction (off-chain execution #1)
-go run main.go commit
+go run main.go commit <amount_alice> <amount_bob> #Commit 1
+go run main.go commit <amount_alice> <amount_bob> #Commit 2
+go run main.go commit <amount_alice> <amount_bob> #Commit 3
+go run main.go commit <amount_alice> <amount_bob> #Commit 4
+...
+
 
 # 12. Sign the commitment transaction (2-of-2 multisig signatures)
 go run main.go sign
