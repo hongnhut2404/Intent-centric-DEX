@@ -77,18 +77,12 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	privKey, _ := btcec.PrivKeyFromBytes(privBytes)
 
 	// Load Bob's UTXO
-	utxoRaw, err := os.ReadFile("data/bob-utxo.json")
+	scanResult, err := GetBobUTXOFromScantxoutset(state.Bob.Address)
 	if err != nil {
-		return fmt.Errorf("missing bob-utxo.json: %v", err)
+		return fmt.Errorf("failed to scan Bob UTXOs: %v", err)
 	}
-	var file UTXOFile
-	if err := json.Unmarshal(utxoRaw, &file); err != nil {
-		return fmt.Errorf("invalid utxo: %v", err)
-	}
-	if len(file.Unspents) == 0 {
-		return fmt.Errorf("no unspents found")
-	}
-	utxo := file.Unspents[0]
+	utxo := scanResult.Unspents[0]
+
 	amountIn := int64(utxo.Amount * 1e8)
 	amountOut := int64(fund.Amount * 1e8)
 	fee := int64(500) // fixed fee
@@ -98,7 +92,7 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	}
 
 	tx := wire.NewMsgTx(wire.TxVersion)
-	txHash, _ := chainhash.NewHashFromStr(utxo.Txid)
+	txHash, _ := chainhash.NewHashFromStr(utxo.TxID)
 	outPoint := wire.NewOutPoint(txHash, utxo.Vout)
 	txIn := wire.NewTxIn(outPoint, nil, nil)
 	tx.AddTxIn(txIn)
