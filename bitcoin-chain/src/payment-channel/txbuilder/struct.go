@@ -67,3 +67,14 @@ type BobKey struct {
 type UTXOFile struct {
 	Unspents []BobUTXO `json:"unspents"`
 }
+
+type ScanTxOutResult struct {
+	Unspents []struct {
+		TxID         string  `json:"txid"`
+		Vout         uint32  `json:"vout"`
+		ScriptPubKey string  `json:"scriptPubKey"`
+		Amount       float64 `json:"amount"`
+		Height       int64   `json:"height"`
+	} `json:"unspents"`
+	TotalAmount float64 `json:"total_amount"`
+}

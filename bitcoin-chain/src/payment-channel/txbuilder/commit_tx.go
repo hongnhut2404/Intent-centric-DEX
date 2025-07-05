@@ -100,7 +100,7 @@ func CreateCommitmentTx(stateFile string, aliceBalance float64, bobBalance float
 	updated, _ := json.MarshalIndent(state, "", "  ")
 	_ = os.WriteFile(stateFile, updated, 0644)
 
-	fmt.Println("✅ Stored latest commitment with OP_RETURN attached")
+	fmt.Println("Stored latest commitment with OP_RETURN attached")
 
 	return nil
 }

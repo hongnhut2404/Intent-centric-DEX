@@ -78,6 +78,17 @@ func main() {
 			fmt.Println("Sign error:", err)
 		}
 
+	case "verify":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: go run main.go verify <commitmentHex>")
+			return
+		}
+		commitmentHex := os.Args[2]
+		err := txbuilder.VerifyCommitmentProposal(commitmentHex)
+		if err != nil {
+			fmt.Println("Verify error:", err)
+		}
+
 	case "settle":
 		// Shortcut: read commit-signed.txt and broadcast manually
 		signed, err := os.ReadFile("data/commit-signed.txt")
