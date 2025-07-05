@@ -104,6 +104,17 @@ func main() {
 		if err != nil {
 			fmt.Println("Refund error:", err)
 		}
+	case "sign-alice":
+		err := txbuilder.SignCommitmentTxAlice("data/state.json")
+		if err != nil {
+			fmt.Println("Sign Alice error:", err)
+		}
+	case "sign-bob":
+		err := txbuilder.SignCommitmentTxBob("data/state.json")
+		if err != nil {
+			fmt.Println("Sign Bob error:", err)
+		}
+
 	case "fund-offchain":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: go run main.go fund-offchain <amount>")
