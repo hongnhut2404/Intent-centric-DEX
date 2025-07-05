@@ -67,11 +67,8 @@ func CreateCommitmentTx(stateFile string, aliceBalance float64, bobBalance float
 	aliceScript, _ := txscript.PayToAddrScript(aliceAddr)
 	tx.AddTxOut(wire.NewTxOut(aliceAmountSat, aliceScript))
 
-	// OP_RETURN commitment metadata
-	commitmentID := len(state.Commitments) + 1
-	opReturnData := fmt.Sprintf("commit:%d,alice:%.8f,bob:%.8f",
-		commitmentID, aliceBalance, bobBalance)
-
+	// OP_RETURN with latest balances
+	opReturnData := fmt.Sprintf("alice:%.8f,bob:%.8f", aliceBalance, bobBalance)
 	opReturnScript, err := txscript.NullDataScript([]byte(opReturnData))
 	if err != nil {
 		return fmt.Errorf("failed to build OP_RETURN script: %v", err)
@@ -92,20 +89,18 @@ func CreateCommitmentTx(stateFile string, aliceBalance float64, bobBalance float
 		return fmt.Errorf("failed to write commit tx: %v", err)
 	}
 
-	// store commitment
-	newCommitment := Commitment{
-		ID:           commitmentID,
+	// update state with *latest* commitment only
+	state.Commitments = []Commitment{{
+		ID:           1,
 		AliceBalance: aliceBalance,
 		BobBalance:   bobBalance,
 		SignedTx:     rawTx,
 		Timestamp:    time.Now().Format(time.RFC3339),
-	}
-	state.Commitments = append(state.Commitments, newCommitment)
-
+	}}
 	updated, _ := json.MarshalIndent(state, "", "  ")
 	_ = os.WriteFile(stateFile, updated, 0644)
 
-	fmt.Println("✅ Stored commitment with ID", newCommitment.ID, "and OP_RETURN attached")
+	fmt.Println("✅ Stored latest commitment with OP_RETURN attached")
 
 	return nil
 }

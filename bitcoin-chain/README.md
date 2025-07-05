@@ -191,8 +191,6 @@ tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 # 4. Go back to payment-channel
 cd src/payment-channel
 
-# 5. Get Bob's UTXO
-bitcoin-cli scantxoutset start "[\"addr(<bob_address_from_state.json>)\"]" > data/bob-utxo.json
 
 # 6. Generate 2-of-2 multisig address (redeemScript and address printed)
 go run main.go multisig
