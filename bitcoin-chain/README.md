@@ -209,15 +209,14 @@ go run main.go set-htlc-tx 9ff1910c7d857a7e887ffc3f87b53f6a388c678d2e573ae929e54
 bitcoin-cli sendrawtransaction <signed_funding_tx>
 
 # 11. Create commitment transaction (off-chain execution #1)
-go run main.go commit <amount_alice> <amount_bob> #Commit 1
-go run main.go commit <amount_alice> <amount_bob> #Commit 2
-go run main.go commit <amount_alice> <amount_bob> #Commit 3
-go run main.go commit <amount_alice> <amount_bob> #Commit 4
+#Commit 1
+go run main.go commit <amount_alice> <amount_bob> # Alice create commit transaction with balance in OP_RETURN
+go run main.go sign-alice # Alice sign the transaction -> Send to Bob
+go run main.go verify # Bob verify transaction to read the information
+go run main.go sign-bob # If Bob agrees -> Sign the transaction
+
+#Commit next
 ...
-
-
-# 12. Sign the commitment transaction (2-of-2 multisig signatures)
-go run main.go sign
 
 # 13. Broadcast the commitment tx (simulate settlement)
 go run main.go settle
