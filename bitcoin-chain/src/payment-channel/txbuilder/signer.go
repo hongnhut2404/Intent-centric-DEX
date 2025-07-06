@@ -158,29 +158,16 @@ func SignCommitmentTxAlice(statePath string) error {
 	aliceSig := ecdsa.Sign(alicePriv, sighash)
 	aliceSigBytes := append(aliceSig.Serialize(), byte(txscript.SigHashAll))
 
-	// add OP_RETURN with Alice's signature
-	opReturnScript, err := txscript.NullDataScript(aliceSigBytes)
-	if err != nil {
-		return fmt.Errorf("failed to build OP_RETURN: %v", err)
-	}
-	tx.AddTxOut(wire.NewTxOut(0, opReturnScript))
-
-	// serialize
-	var buf bytes.Buffer
-	if err := tx.Serialize(&buf); err != nil {
-		return fmt.Errorf("serialization failed: %v", err)
+	// store Alice’s partial signature in a file
+	if err := os.WriteFile("data/alice-sig.txt", []byte(hex.EncodeToString(aliceSigBytes)), 0644); err != nil {
+		return fmt.Errorf("failed to store Alice's sig: %v", err)
 	}
 
-	finalHex := hex.EncodeToString(buf.Bytes())
-	fmt.Println("Alice signed transaction with OP_RETURN signature attached:")
-	fmt.Println(finalHex)
-
-	// store for Bob to read
-	return os.WriteFile("data/commit-alice-signed.txt", []byte(finalHex), 0644)
+	fmt.Println("Alice’s partial signature saved to data/alice-sig.txt")
+	return nil
 }
 
 func SignCommitmentTxBob(statePath string) error {
-	// Load state
 	raw, err := os.ReadFile(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to read state: %v", err)
@@ -190,61 +177,46 @@ func SignCommitmentTxBob(statePath string) error {
 		return fmt.Errorf("invalid state: %v", err)
 	}
 
-	// Load Alice-signed transaction with her signature in OP_RETURN
-	txHex, err := os.ReadFile("data/commit-alice-signed.txt")
+	// load Alice's partial signature
+	aliceSigHex, err := os.ReadFile("data/alice-sig.txt")
 	if err != nil {
-		return fmt.Errorf("missing Alice-signed tx: %v", err)
+		return fmt.Errorf("missing Alice's signature file: %v", err)
 	}
-	rawTxBytes, err := hex.DecodeString(string(txHex))
+	aliceSigBytes, err := hex.DecodeString(string(aliceSigHex))
 	if err != nil {
-		return fmt.Errorf("invalid tx hex: %v", err)
+		return fmt.Errorf("invalid Alice sig hex: %v", err)
 	}
 
+	// load unsigned tx
+	txHex, err := os.ReadFile("data/commit-unsigned.txt")
+	if err != nil {
+		return fmt.Errorf("missing unsigned tx: %v", err)
+	}
+	rawTxBytes, _ := hex.DecodeString(string(txHex))
 	tx := wire.NewMsgTx(wire.TxVersion)
 	if err := tx.Deserialize(bytes.NewReader(rawTxBytes)); err != nil {
 		return fmt.Errorf("cannot parse tx: %v", err)
 	}
 
-	// find Alice signature in OP_RETURN
-	var aliceSigBytes []byte
-	found := false
-	for _, out := range tx.TxOut {
-		if txscript.GetScriptClass(out.PkScript) == txscript.NullDataTy {
-			asm, err := txscript.DisasmString(out.PkScript)
-			if err == nil && len(asm) > 0 {
-				// parse pushdata
-				parsed, _ := txscript.PushedData(out.PkScript)
-				if len(parsed) > 0 {
-					aliceSigBytes = parsed[0]
-					found = true
-					break
-				}
-			}
-		}
-	}
-	if !found {
-		return fmt.Errorf("alice's signature not found in OP_RETURN")
-	}
-
-	// Decode redeem script
+	// decode redeem
 	redeemScript, _ := hex.DecodeString(state.HTLC.RedeemScript)
 
 	// sighash
 	sighash, _ := txscript.CalcSignatureHash(redeemScript, txscript.SigHashAll, tx, 0)
 
-	// verify Alice signature
+	// verify Alice's partial
 	alicePubBytes, _ := hex.DecodeString(state.Alice.PubKey)
 	alicePub, _ := btcec.ParsePubKey(alicePubBytes)
 	aliceSigParsed, err := ecdsa.ParseDERSignature(aliceSigBytes[:len(aliceSigBytes)-1])
 	if err != nil {
-		return fmt.Errorf("failed to parse Alice's signature: %v", err)
+		return fmt.Errorf("failed to parse Alice's sig: %v", err)
 	}
 	if !aliceSigParsed.Verify(sighash, alicePub) {
-		return fmt.Errorf("Alice's signature is invalid")
+		return fmt.Errorf("Alice signature invalid")
 	}
-	fmt.Println("Alice's signature verified from OP_RETURN")
+	fmt.Println("✅ Alice's signature verified")
 
-	// Bob signs
+	// bob signs
 	bobPriv, _ := btcec.PrivKeyFromBytes(decodeHex(state.Bob.PrivKey))
 	bobSig := ecdsa.Sign(bobPriv, sighash)
 	bobSigBytes := append(bobSig.Serialize(), byte(txscript.SigHashAll))
@@ -257,24 +229,15 @@ func SignCommitmentTxBob(statePath string) error {
 		AddData(redeemScript).
 		Script()
 	if err != nil {
-		return fmt.Errorf("building scriptSig failed: %v", err)
+		return fmt.Errorf("failed to build scriptSig: %v", err)
 	}
 	tx.TxIn[0].SignatureScript = scriptSig
-
-	// remove the OP_RETURN output because no longer needed
-	var newOutputs []*wire.TxOut
-	for _, out := range tx.TxOut {
-		if txscript.GetScriptClass(out.PkScript) != txscript.NullDataTy {
-			newOutputs = append(newOutputs, out)
-		}
-	}
-	tx.TxOut = newOutputs
 
 	// serialize
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
 	finalHex := hex.EncodeToString(buf.Bytes())
 
-	fmt.Println("Bob finalized signed tx:", finalHex)
+	fmt.Println("Bob finalized signed commitment tx:", finalHex)
 	return os.WriteFile("data/commit-signed.txt", []byte(finalHex), 0644)
 }

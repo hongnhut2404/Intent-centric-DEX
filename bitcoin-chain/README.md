@@ -213,7 +213,7 @@ bitcoin-cli sendrawtransaction <signed_funding_tx>
 go run main.go commit <amount_alice> <amount_bob> # Alice create commit transaction with balance in OP_RETURN
 go run main.go sign-alice # Alice sign the transaction -> Send to Bob
 go run main.go verify # Bob verify transaction to read the information
-go run main.go sign-bob # If Bob agrees -> Sign the transaction
+go run main.go sign-bob yes # If Bob agrees -> Sign the transaction
 
 #Commit next
 ...
