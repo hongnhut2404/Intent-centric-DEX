@@ -13,7 +13,7 @@ async function main() {
     for (const log of receipt.logs) {
         try {
             const parsed = contract.interface.parseLog(log);
-            if (parsed.name === "TradeExecuted") {
+            if (parsed.name === "TradeMatched") {
                 const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] = parsed.args;
                 const output = {
                     buyIntentId: Number(buyIntentId),
