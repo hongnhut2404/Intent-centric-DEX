@@ -34,13 +34,6 @@ type Commitment struct {
 	Timestamp    string  `json:"timestamp"`
 }
 
-type BobUTXO struct {
-	Txid         string  `json:"txid"`
-	Vout         uint32  `json:"vout"`
-	Amount       float64 `json:"amount"`
-	ScriptPubKey string  `json:"scriptPubKey"`
-}
-
 type FundInput struct {
 	Address string  `json:"address"`
 	Amount  float64 `json:"amount"`
@@ -62,10 +55,6 @@ type BobKey struct {
 	PrivKey string `json:"privkey"`
 	PubKey  string `json:"pubkey"`
 	Address string `json:"address"`
-}
-
-type UTXOFile struct {
-	Unspents []BobUTXO `json:"unspents"`
 }
 
 type ScanTxOutResult struct {

@@ -5,17 +5,6 @@ import (
 	"fmt"
 )
 
-type ScanTxOutResult struct {
-	Unspents []struct {
-		TxID         string  `json:"txid"`
-		Vout         uint32  `json:"vout"`
-		ScriptPubKey string  `json:"scriptPubKey"`
-		Amount       float64 `json:"amount"`
-		Height       int64   `json:"height"`
-	} `json:"unspents"`
-	TotalAmount float64 `json:"total_amount"`
-}
-
 func GetBobUTXOFromScantxoutset(bobAddress string) (*ScanTxOutResult, error) {
 	scanArgs := []interface{}{
 		"start",

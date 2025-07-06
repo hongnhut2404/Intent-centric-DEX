@@ -81,7 +81,17 @@ func FundMultisigFromBobOffchain(statePath string, amount float64) error {
 	if err != nil {
 		return fmt.Errorf("failed to scan Bob UTXOs: %v", err)
 	}
-	utxo := scanResult.Unspents[0]
+	if len(scanResult.Unspents) == 0 {
+		return fmt.Errorf("no UTXO found for Bob")
+	}
+
+	// pick largest UTXO
+	var utxo = scanResult.Unspents[0]
+	for _, u := range scanResult.Unspents {
+		if u.Amount > utxo.Amount {
+			utxo = u
+		}
+	}
 
 	amountIn := int64(utxo.Amount * 1e8)
 	amountOut := int64(fund.Amount * 1e8)
