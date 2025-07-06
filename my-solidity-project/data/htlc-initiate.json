@@ -1,7 +1,0 @@
-{
-  "htlcAddress": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-  "senderAddress": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-  "recipientAddress": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-  "timelock": 1750408262,
-  "amount": "5"
-}
