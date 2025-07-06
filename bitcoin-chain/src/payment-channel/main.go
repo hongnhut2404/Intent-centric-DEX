@@ -110,9 +110,27 @@ func main() {
 			fmt.Println("Sign Alice error:", err)
 		}
 	case "sign-bob":
-		err := txbuilder.SignCommitmentTxBob("data/state.json")
-		if err != nil {
-			fmt.Println("Sign Bob error:", err)
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: go run main.go sign-bob <yes|no>")
+			return
+		}
+		choice := os.Args[2]
+		if choice == "yes" {
+			err := txbuilder.SignCommitmentTxBob("data/state.json")
+			if err != nil {
+				fmt.Println("Sign Bob error:", err)
+			}
+		} else if choice == "no" {
+			fmt.Println("Bob refused the proposal, broadcasting the latest valid commitment to settle the channel.")
+			signed, err := os.ReadFile("data/commit-signed.txt")
+			if err != nil {
+				fmt.Println("Missing previous signed tx:", err)
+				return
+			}
+			fmt.Println("Use bitcoin-cli to broadcast this last commitment:")
+			fmt.Println("bitcoin-cli sendrawtransaction", string(signed))
+		} else {
+			fmt.Println("Unknown choice, use yes or no")
 		}
 
 	case "fund-offchain":
