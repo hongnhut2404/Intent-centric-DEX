@@ -7,14 +7,18 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "hardhat/console.sol";
 
 contract IntentMatching is Ownable, ReentrancyGuard {
-    enum IntentStatus { Pending, Filled, Cancelled }
+    enum IntentStatus {
+        Pending,
+        Filled,
+        Cancelled
+    }
 
     constructor() Ownable(msg.sender) {}
 
     struct BuyIntent {
         address buyer;
-        uint256 sellAmount;       // BTC amount (off-chain)
-        uint256 minBuyAmount;     // ETH expected (on-chain)
+        uint256 sellAmount; // BTC amount (off-chain)
+        uint256 minBuyAmount; // ETH expected (on-chain)
         uint256 locktime;
         uint256 createdAt;
         IntentStatus status;
@@ -23,15 +27,29 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct SellIntent {
         address seller;
-        uint256 sellAmount;       // ETH amount
-        uint256 minBuyAmount;     // BTC expected
+        uint256 sellAmount; // ETH amount
+        uint256 minBuyAmount; // BTC expected
         uint256 deadline;
         IntentStatus status;
         bytes32 offchainId;
     }
 
+    struct MatchedTrade {
+        uint256 buyIntentId;
+        uint256 sellIntentId;
+        address executor;
+        address recipient;
+        uint256 ethAmount;
+        uint256 btcAmount;
+        uint256 locktime;
+        uint256 timestamp;
+    }
+
     uint256 public intentCountBuy;
     uint256 public intentCountSell;
+
+    mapping(uint256 => MatchedTrade) public matchedTrades;
+    uint256 public matchedTradeCount;
 
     mapping(uint256 => BuyIntent) public buyIntents;
     mapping(uint256 => SellIntent) public sellIntents;
@@ -94,7 +112,14 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit BuyIntentCreated(id, msg.sender, sellAmount, minBuyAmount, locktime, offchainId);
+        emit BuyIntentCreated(
+            id,
+            msg.sender,
+            sellAmount,
+            minBuyAmount,
+            locktime,
+            offchainId
+        );
         return id;
     }
 
@@ -117,7 +142,14 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit SellIntentCreated(id, msg.sender, sellAmount, minBuyAmount, deadline, offchainId);
+        emit SellIntentCreated(
+            id,
+            msg.sender,
+            sellAmount,
+            minBuyAmount,
+            deadline,
+            offchainId
+        );
         return id;
     }
 
@@ -131,7 +163,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
         for (uint256 i = 0; i < Math.min(intentCountSell, maxIterations); i++) {
             SellIntent storage sell = sellIntents[i];
-            if (sell.status != IntentStatus.Pending || block.timestamp > sell.deadline) {
+            if (
+                sell.status != IntentStatus.Pending ||
+                block.timestamp > sell.deadline
+            ) {
                 continue;
             }
 
@@ -154,7 +189,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
         uint256 buyerPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
 
-        (bool found, uint256 sellIntentId) = findBestSellIntent(buyerPrice, 100);
+        (bool found, uint256 sellIntentId) = findBestSellIntent(
+            buyerPrice,
+            100
+        );
         require(found, "No matching sell intent");
 
         SellIntent storage sell = sellIntents[sellIntentId];
@@ -173,7 +211,20 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             buy.locktime
         );
 
-        console.log("Trade matched and event emitted for off-chain HTLC to handle.");
+        // store matched trade on-chain
+        matchedTrades[matchedTradeCount] = MatchedTrade({
+            buyIntentId: buyIntentId,
+            sellIntentId: sellIntentId,
+            executor: msg.sender,
+            recipient: buy.buyer,
+            ethAmount: sell.sellAmount,
+            btcAmount: buy.sellAmount,
+            locktime: buy.locktime,
+            timestamp: block.timestamp
+        });
+        matchedTradeCount++;
+
+        console.log("Trade matched and stored on-chain.");
     }
 
     function prepareHTLC(
@@ -187,9 +238,14 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         SellIntent storage sell = sellIntents[sellIntentId];
 
         require(buy.status == IntentStatus.Filled, "BuyIntent not matched yet");
-        require(sell.status == IntentStatus.Filled, "SellIntent not matched yet");
+        require(
+            sell.status == IntentStatus.Filled,
+            "SellIntent not matched yet"
+        );
 
-        bytes32 lockId = keccak256(abi.encodePacked(buyIntentId, sellIntentId, block.timestamp));
+        bytes32 lockId = keccak256(
+            abi.encodePacked(buyIntentId, sellIntentId, block.timestamp)
+        );
 
         emit HTLCPrepared(
             buyIntentId,
@@ -207,7 +263,9 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         return buyIntents[id];
     }
 
-    function getSellIntent(uint256 id) external view returns (SellIntent memory) {
+    function getSellIntent(
+        uint256 id
+    ) external view returns (SellIntent memory) {
         return sellIntents[id];
     }
 }
