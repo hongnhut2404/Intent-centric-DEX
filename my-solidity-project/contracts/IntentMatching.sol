@@ -65,6 +65,15 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 locktime
     );
 
+    event HTLCPrepared(
+        uint256 indexed buyIntentId,
+        uint256 indexed sellIntentId,
+        bytes32 lockId,
+        bytes32 secretHash,
+        uint256 timelock,
+        string btcReceiverAddress
+    );
+
     function createBuyIntent(
         uint256 sellAmount,
         uint256 minBuyAmount,
@@ -165,6 +174,33 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         );
 
         console.log("Trade matched and event emitted for off-chain HTLC to handle.");
+    }
+
+    function prepareHTLC(
+        uint256 buyIntentId,
+        uint256 sellIntentId,
+        bytes32 secretHash,
+        uint256 timelock,
+        string calldata btcReceiverAddress
+    ) external onlyOwner {
+        BuyIntent storage buy = buyIntents[buyIntentId];
+        SellIntent storage sell = sellIntents[sellIntentId];
+
+        require(buy.status == IntentStatus.Filled, "BuyIntent not matched yet");
+        require(sell.status == IntentStatus.Filled, "SellIntent not matched yet");
+
+        bytes32 lockId = keccak256(abi.encodePacked(buyIntentId, sellIntentId, block.timestamp));
+
+        emit HTLCPrepared(
+            buyIntentId,
+            sellIntentId,
+            lockId,
+            secretHash,
+            timelock,
+            btcReceiverAddress
+        );
+
+        console.log("HTLC prepared and emitted for off-chain execution.");
     }
 
     function getBuyIntent(uint256 id) external view returns (BuyIntent memory) {
