@@ -1,50 +1,66 @@
+// scripts/matchingIntentComponent.js
 const { ethers } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-    const { address } = JSON.parse(fs.readFileSync("data/intent-matching-address.json"));
-    const IntentMatching = await ethers.getContractFactory("IntentMatching");
-    const contract = await IntentMatching.attach(address);
+  const { address } = JSON.parse(
+    fs.readFileSync("data/intent-matching-address.json")
+  );
+  const IntentMatching = await ethers.getContractFactory("IntentMatching");
+  const contract = await IntentMatching.attach(address);
 
-    console.log("Matching intents...");
-    const matchTx = await contract.matchIntent(0);
-    const receipt = await matchTx.wait();
+  console.log("Matching intents...");
 
-    for (const log of receipt.logs) {
-        try {
-            const parsed = contract.interface.parseLog(log);
-            if (parsed.name === "TradeMatched") {
-                const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] = parsed.args;
-                const output = {
-                    buyIntentId: Number(buyIntentId),
-                    sellIntentId: Number(sellIntentId),
-                    recipient,
-                    token,
-                    sender,
-                    amountETH: amountETH.toString(),
-                    amountBTC: amountBTC.toString(),
-                    locktime: locktime.toString()
-                };
+  const matchTx = await contract.matchIntent(0);
+  const receipt = await matchTx.wait();
 
-                fs.writeFileSync("data/trade-executed.json", JSON.stringify(output, null, 2));
-                console.log("Event written to data/trade-executed.json");
+  let matchedTradeId;
 
-                const htlcData = {
-                    htlcAddress: address,
-                    senderAddress: sender,
-                    recipientAddress: recipient,
-                    timelock: Number(locktime),
-                    amount: amountETH.toString()
-                };
+  for (const log of receipt.logs) {
+    try {
+      const parsed = contract.interface.parseLog(log);
 
-                fs.writeFileSync("data/htlc-initiate.json", JSON.stringify(htlcData, null, 2));
-                console.log("HTLC data written to data/htlc-initiate.json");
-            }
-        } catch (err) {
-            console.error("Log parsing error:", err.message);
-        }
+      if (parsed.name === "TradeMatched") {
+        const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] =
+          parsed.args;
+
+        console.log(`✅ TradeMatched event:
+  - buyIntentId: ${buyIntentId}
+  - sellIntentId: ${sellIntentId}
+  - recipient: ${recipient}
+  - executor(sender): ${sender}
+  - ETH amount: ${amountETH}
+  - BTC amount: ${amountBTC}
+  - locktime: ${locktime}`);
+
+        // use matchedTradeCount-1 because it increments after storing
+        matchedTradeId = await contract.matchedTradeCount() - 1n;
+
+        // retrieve from contract storage
+        const storedTrade = await contract.matchedTrades(matchedTradeId);
+
+        console.log(`🟢 Stored on-chain matched trade:
+  - buyIntentId: ${storedTrade.buyIntentId}
+  - sellIntentId: ${storedTrade.sellIntentId}
+  - recipient: ${storedTrade.recipient}
+  - ethAmount: ${storedTrade.ethAmount}
+  - btcAmount: ${storedTrade.btcAmount}
+  - locktime: ${storedTrade.locktime}
+  - timestamp: ${storedTrade.timestamp}
+        `);
+
+        // if you want to pass to HTLC script directly:
+        console.log(`⚡ Pass to HTLC:
+  - recipient: ${storedTrade.recipient}
+  - ethAmount: ${storedTrade.ethAmount}
+  - locktime: ${storedTrade.locktime}
+        `);
+
+      }
+    } catch (err) {
+      console.error("Log parsing error:", err.message);
     }
+  }
 }
 
 main().catch(console.error);
-
