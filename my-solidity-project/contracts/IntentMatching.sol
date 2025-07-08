@@ -92,6 +92,16 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         string btcReceiverAddress
     );
 
+    address public htlcAddress;
+
+    event HTLCAddressUpdated(address indexed htlcAddress);
+
+    function setHTLCAddress(address _htlc) external onlyOwner {
+        require(_htlc != address(0), "Invalid HTLC address");
+        htlcAddress = _htlc;
+        emit HTLCAddressUpdated(_htlc);
+    }
+
     function createBuyIntent(
         uint256 sellAmount,
         uint256 minBuyAmount,

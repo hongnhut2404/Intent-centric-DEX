@@ -3,30 +3,35 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
+  // Deploy HTLC contract
   const HTLC = await hre.ethers.getContractFactory("HTLC");
   const htlc = await HTLC.deploy();
   await htlc.waitForDeployment();
   console.log("HTLC deployed to:", htlc.target);
 
-  const filePath = path.join(__dirname, "../../data/htlc-initiate.json");
-
-  let data = {};
-  if (fs.existsSync(filePath)) {
-    const raw = fs.readFileSync(filePath);
-    try {
-      data = JSON.parse(raw);
-    } catch (err) {
-      console.warn("Invalid existing JSON. Starting fresh.");
-    }
+  // Read IntentMatching address from JSON
+  const filePath = path.resolve(__dirname, "../../data/intent-matching-address.json");
+  if (!fs.existsSync(filePath)) {
+    throw new Error("intent-matching-address.json not found");
   }
 
-  data.htlcAddress = htlc.target;
+  const { address: intentMatchingAddress } = JSON.parse(fs.readFileSync(filePath));
+  if (!intentMatchingAddress) {
+    throw new Error("IntentMatching address not found in JSON file");
+  }
 
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-  console.log("Updated htlc-initiate.json with htlcAddress");
+  // Attach to IntentMatching and set HTLC address
+  const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
+  const intentMatching = await IntentMatching.attach(intentMatchingAddress);
+  const [deployer] = await hre.ethers.getSigners();
+
+  const tx = await intentMatching.connect(deployer).setHTLCAddress(htlc.target);
+  await tx.wait();
+
+  console.log("HTLC address stored on-chain in IntentMatching contract.");
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error("Error:", error);
   process.exitCode = 1;
 });
