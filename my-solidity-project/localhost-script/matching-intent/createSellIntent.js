@@ -1,4 +1,3 @@
-// scripts/createSellIntents.js
 const hre = require("hardhat");
 const ethers = require("ethers");
 const fs = require("fs");
@@ -18,17 +17,20 @@ async function main() {
   const deadline = Math.floor(Date.now() / 1000) + 3600;
   const offchainId = ethers.encodeBytes32String("sell-eth");
 
-  // define multiple sell intents
+  // Define multiple sell intents (in ETH / BTC units)
   const sellIntents = [
-    { amount: 15, minBuy: 9 },
-    { amount: 5,  minBuy: 1 },
-    { amount: 20, minBuy: 12 }
+    { amountBTC: 15.0, minBuyETH: "9.0" },
+    { amountBTC: 5.0,  minBuyETH: "1.0" },
+    { amountBTC: 20.0, minBuyETH: "12.0" }
   ];
 
-  for (const { amount, minBuy } of sellIntents) {
+  for (const { amountBTC, minBuyETH } of sellIntents) {
+    const sellAmount = BigInt(amountBTC * 1e8); // BTC to satoshi
+    const minBuyAmount = hre.ethers.parseUnits(minBuyETH, 18); // ETH to wei
+
     const tx = await contract
       .connect(user2)
-      .createSellIntent(amount, minBuy, deadline, offchainId);
+      .createSellIntent(sellAmount, minBuyAmount, deadline, offchainId);
 
     console.log(`Transaction sent: ${tx.hash}`);
     const receipt = await tx.wait();
@@ -54,8 +56,8 @@ async function main() {
           console.log(`SellIntent created:
   - id: ${intentId}
   - seller: ${seller}
-  - sellAmount: ${sellAmount}
-  - minBuyAmount: ${minBuyAmount}
+  - sellAmount: ${Number(sellAmount) / 1e8} BTC
+  - minBuyAmount: ${hre.ethers.formatEther(minBuyAmount)} ETH
   - deadline: ${emittedDeadline}
           `);
         }
