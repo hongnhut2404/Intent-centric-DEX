@@ -69,7 +69,6 @@ async function main() {
   console.log("SHA256 (BTC):", hashSha256);
   console.log("Timelock:", timelock.toString());
   console.log("Amount:", hre.ethers.formatEther(amount), "ETH");
-  console.log("Sending amount:", amount, "wei =", hre.ethers.formatEther(amount), "ETH");
   console.log("Sender:", lock.sender);
   console.log("Recipient:", recipient);
 }

@@ -29,9 +29,11 @@ async function main() {
   - sellIntentId: ${sellIntentId}
   - recipient: ${recipient}
   - executor(sender): ${sender}
-  - ETH amount: ${amountETH}
-  - BTC amount: ${amountBTC}
-  - locktime: ${locktime}`);
+  - ETH amount: ${ethers.formatEther(amountETH)} ETH
+  - BTC amount: ${Number(amountBTC) / 1e8} BTC
+  - locktime: ${locktime}
+`);
+
 
         // use matchedTradeCount-1 because it increments after storing
         matchedTradeId = await contract.matchedTradeCount() - 1n;
@@ -43,11 +45,11 @@ async function main() {
   - buyIntentId: ${storedTrade.buyIntentId}
   - sellIntentId: ${storedTrade.sellIntentId}
   - recipient: ${storedTrade.recipient}
-  - ethAmount: ${storedTrade.ethAmount}
-  - btcAmount: ${storedTrade.btcAmount}
+  - ethAmount: ${ethers.formatEther(storedTrade.ethAmount)} ETH
+  - btcAmount: ${Number(storedTrade.btcAmount) / 1e8} BTC
   - locktime: ${storedTrade.locktime}
   - timestamp: ${storedTrade.timestamp}
-        `);
+`);
 
         // if you want to pass to HTLC script directly:
         console.log(`⚡ Pass to HTLC:

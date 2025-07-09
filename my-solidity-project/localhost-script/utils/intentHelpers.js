@@ -30,32 +30,32 @@ async function createSellIntent(intentMatching, user, ethAmount, minBTC, deadlin
     console.log(`SellIntent created by ${user.address}: ${ethAmount} ETH for ${minBTCExpected / 1e8} BTC`);
 }
 
-async function printAllIntents(intentMatching) {
-  const buyCount = await intentMatching.intentCountBuy();
-  const sellCount = await intentMatching.intentCountSell();
+async function printAllIntents(contract) {
+  const buyCount = await contract.intentCountBuy();
+  const sellCount = await contract.intentCountSell();
 
   console.log("---- Buy Intents ----");
-  for (let i = 0; i < buyCount; i++) {
-    const intent = await intentMatching.getBuyIntent(i);
-    console.log(`ID ${i}:`, {
-      buyer: intent.buyer,
-      sellAmountBTC: Number(intent.sellAmount) / 1e8,
-      minBuyAmountETH: Number(intent.minBuyAmount) / 1e18,
-      status: intent.status,
-      locktime: Number(intent.locktime)
-    });
+  for (let i = 0n; i < buyCount; i++) {
+    const intent = await contract.buyIntents(i);
+    console.log(`ID ${i}: {`);
+    console.log(`  buyer: '${intent.buyer}',`);
+    console.log(`  sellAmountBTC: ${Number(intent.sellAmount) / 1e8},`);
+    console.log(`  minBuyAmountETH: ${ethers.formatEther(intent.minBuyAmount)},`);
+    console.log(`  status: ${intent.status},`);
+    console.log(`  locktime: ${intent.locktime}`);
+    console.log(`}`);
   }
 
   console.log("\n---- Sell Intents ----");
-  for (let i = 0; i < sellCount; i++) {
-    const intent = await intentMatching.getSellIntent(i);
-    console.log(`ID ${i}:`, {
-      seller: intent.seller,
-      sellAmountETH: Number(intent.sellAmount) / 1e18,
-      minBuyAmountBTC: Number(intent.minBuyAmount) / 1e8,
-      status: intent.status,
-      deadline: Number(intent.deadline)
-    });
+  for (let i = 0n; i < sellCount; i++) {
+    const intent = await contract.sellIntents(i);
+    console.log(`ID ${i}: {`);
+    console.log(`  seller: '${intent.seller}',`);
+    console.log(`  sellAmountBTC: ${Number(intent.sellAmount) / 1e8},`);
+    console.log(`  minBuyAmountETH: ${ethers.formatEther(intent.minBuyAmount)},`);
+    console.log(`  status: ${intent.status},`);
+    console.log(`  deadline: ${intent.deadline}`);
+    console.log(`}`);
   }
 }
 

@@ -65,7 +65,7 @@ async function main() {
     }
   }
 
-  console.log("✅ All BuyIntents created by User1");
+  console.log("All BuyIntents created by User1");
 }
 
 main().catch(console.error);
