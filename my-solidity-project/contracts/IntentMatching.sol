@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "hardhat/console.sol";
 
 contract IntentMatching is Ownable, ReentrancyGuard {
-
     enum IntentStatus {
         Pending,
         Filled,
@@ -182,7 +181,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             }
 
             uint256 sellPrice = (sell.minBuyAmount * 1e18) / sell.sellAmount;
-            if (sellPrice > buyerPrice) continue;
+            if (sellPrice < buyerPrice) continue;
 
             if (sellPrice < bestSellPrice) {
                 bestSellPrice = sellPrice;
@@ -198,44 +197,68 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         require(buy.status == IntentStatus.Pending, "BuyIntent not pending");
         require(block.timestamp <= buy.locktime, "BuyIntent expired");
 
-        uint256 buyerPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+        uint256 totalBTCNeeded = buy.sellAmount;
+        uint256 totalETHPaid = 0;
+        uint256 remainingBTC = totalBTCNeeded;
 
-        (bool found, uint256 sellIntentId) = findBestSellIntent(
-            buyerPrice,
-            100
-        );
-        require(found, "No matching sell intent");
+        for (uint256 i = 0; i < intentCountSell && remainingBTC > 0; i++) {
+            SellIntent storage sell = sellIntents[i];
 
-        SellIntent storage sell = sellIntents[sellIntentId];
+            if (
+                sell.status != IntentStatus.Pending ||
+                block.timestamp > sell.deadline
+            ) continue;
+
+            uint256 sellPrice = (sell.minBuyAmount * 1e18) / sell.sellAmount;
+            uint256 buyPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+
+            if (sellPrice > buyPrice) continue;
+
+            uint256 matchedBTC = sell.sellAmount >= remainingBTC
+                ? remainingBTC
+                : sell.sellAmount;
+
+            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) /
+                sell.sellAmount;
+
+            emit TradeMatched(
+                buyIntentId,
+                i,
+                msg.sender,
+                address(0),
+                buy.buyer,
+                matchedETH,
+                matchedBTC,
+                buy.locktime
+            );
+
+            matchedTrades[matchedTradeCount++] = MatchedTrade({
+                buyIntentId: buyIntentId,
+                sellIntentId: i,
+                executor: msg.sender,
+                recipient: buy.buyer,
+                ethAmount: matchedETH,
+                btcAmount: matchedBTC,
+                locktime: buy.locktime,
+                timestamp: block.timestamp
+            });
+
+            remainingBTC -= matchedBTC;
+            totalETHPaid += matchedETH;
+
+            if (matchedBTC == sell.sellAmount) {
+                sell.status = IntentStatus.Filled;
+            } else {
+                sell.sellAmount -= matchedBTC;
+                sell.minBuyAmount -= matchedETH;
+            }
+        }
+
+        require(remainingBTC == 0, "Not enough matching sell intents");
 
         buy.status = IntentStatus.Filled;
-        sell.status = IntentStatus.Filled;
 
-        emit TradeMatched(
-            buyIntentId,
-            sellIntentId,
-            msg.sender,
-            address(0),
-            buy.buyer,
-            sell.sellAmount,
-            buy.sellAmount,
-            buy.locktime
-        );
-
-        // store matched trade on-chain
-        matchedTrades[matchedTradeCount] = MatchedTrade({
-            buyIntentId: buyIntentId,
-            sellIntentId: sellIntentId,
-            executor: msg.sender,
-            recipient: buy.buyer,
-            ethAmount: sell.sellAmount,
-            btcAmount: buy.sellAmount,
-            locktime: buy.locktime,
-            timestamp: block.timestamp
-        });
-        matchedTradeCount++;
-
-        console.log("Trade matched and stored on-chain.");
+        console.log("BuyIntent partially matched with multiple SellIntents");
     }
 
     function prepareHTLC(
