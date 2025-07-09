@@ -11,7 +11,7 @@ async function main() {
 
   console.log("Matching intents...");
 
-  const matchTx = await contract.matchIntent(0);
+  const matchTx = await contract.matchIntent(2);
   const receipt = await matchTx.wait();
 
   let matchedTradeId;

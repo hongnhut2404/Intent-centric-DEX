@@ -17,9 +17,7 @@ async function main() {
 
   // Define multiple buy intents (amounts in BTC/ETH, not sat/wei)
   const buyIntents = [
-    { amountBTC: 2.0, minBuyETH: "1.5" },
-    { amountBTC: 8.0, minBuyETH: "4.2" },
-    { amountBTC: 5.0, minBuyETH: "2.75" }
+    { amountBTC: 8.0, minBuyETH: "4.0" }
   ];
 
   for (const { amountBTC, minBuyETH } of buyIntents) {

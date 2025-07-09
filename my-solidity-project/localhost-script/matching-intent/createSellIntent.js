@@ -19,8 +19,8 @@ async function main() {
 
   // Define multiple sell intents (in ETH / BTC units)
   const sellIntents = [
-    { amountBTC: 15.0, minBuyETH: "9.0" },
-    { amountBTC: 5.0,  minBuyETH: "1.0" },
+    { amountBTC: 1.0, minBuyETH: "0.75" },
+    { amountBTC: 8.0,  minBuyETH: "6.0" },
     { amountBTC: 20.0, minBuyETH: "12.0" }
   ];
 

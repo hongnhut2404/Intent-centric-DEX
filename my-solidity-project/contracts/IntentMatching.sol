@@ -34,6 +34,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         bytes32 offchainId;
     }
 
+    struct RateEntry {
+        uint256 index;
+        uint256 rate;
+    }
+
     struct MatchedTrade {
         uint256 buyIntentId;
         uint256 sellIntentId;
@@ -198,10 +203,16 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         require(block.timestamp <= buy.locktime, "BuyIntent expired");
 
         uint256 totalBTCNeeded = buy.sellAmount;
-        uint256 totalETHPaid = 0;
         uint256 remainingBTC = totalBTCNeeded;
+        uint256 totalETHPaid = 0;
 
-        for (uint256 i = 0; i < intentCountSell && remainingBTC > 0; i++) {
+        uint256 buyPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+
+        // Step 1: Gather all eligible sell intents
+        RateEntry[] memory candidates = new RateEntry[](intentCountSell);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < intentCountSell; i++) {
             SellIntent storage sell = sellIntents[i];
 
             if (
@@ -209,10 +220,41 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 block.timestamp > sell.deadline
             ) continue;
 
-            uint256 sellPrice = (sell.minBuyAmount * 1e18) / sell.sellAmount;
-            uint256 buyPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+            uint256 sellPrice = (sell.sellAmount * 1e18) / sell.minBuyAmount;
 
-            if (sellPrice > buyPrice) continue;
+            if (sellPrice <= buyPrice) {
+                candidates[count++] = RateEntry(i, sellPrice);
+                console.log("Buy price (ETH/BTC):", buyPrice);
+                console.log(
+                    "Sell price (ETH/BTC) for sellIntent",
+                    i,
+                    ":",
+                    sellPrice
+                );
+            }
+        }
+
+        require(count > 0, "No matching sell intents found");
+
+        // Step 2: Greedy matching (lowest rate first)
+        for (uint256 m = 0; m < count && remainingBTC > 0; m++) {
+            // Find lowest rate among remaining
+            uint256 bestIdx = m;
+            for (uint256 j = m + 1; j < count; j++) {
+                if (candidates[j].rate < candidates[bestIdx].rate) {
+                    bestIdx = j;
+                }
+            }
+
+            // Swap to sort progressively
+            if (bestIdx != m) {
+                RateEntry memory temp = candidates[m];
+                candidates[m] = candidates[bestIdx];
+                candidates[bestIdx] = temp;
+            }
+
+            uint256 i = candidates[m].index;
+            SellIntent storage sell = sellIntents[i];
 
             uint256 matchedBTC = sell.sellAmount >= remainingBTC
                 ? remainingBTC
@@ -255,10 +297,9 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         }
 
         require(remainingBTC == 0, "Not enough matching sell intents");
-
         buy.status = IntentStatus.Filled;
 
-        console.log("BuyIntent partially matched with multiple SellIntents");
+        console.log("BuyIntent matched with best-rate sell intents");
     }
 
     function prepareHTLC(
