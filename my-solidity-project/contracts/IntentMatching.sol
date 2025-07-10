@@ -96,7 +96,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 timelock,
         string btcReceiverAddress
     );
-
+    event NoMatchingSellIntent(uint256 indexed buyIntentId);
     address public htlcAddress;
 
     event HTLCAddressUpdated(address indexed htlcAddress);
@@ -296,7 +296,15 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             }
         }
 
-        require(remainingBTC == 0, "Not enough matching sell intents");
+        if (count == 0) {
+            emit NoMatchingSellIntent(buyIntentId);
+            console.log(
+                "No acceptable sell intents found for BuyIntent",
+                buyIntentId
+            );
+            return;
+        }
+
         buy.status = IntentStatus.Filled;
 
         console.log("BuyIntent matched with best-rate sell intents");

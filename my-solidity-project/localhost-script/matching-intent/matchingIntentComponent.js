@@ -24,7 +24,7 @@ async function main() {
         const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] =
           parsed.args;
 
-        console.log(`✅ TradeMatched event:
+        console.log(`TradeMatched event:
   - buyIntentId: ${buyIntentId}
   - sellIntentId: ${sellIntentId}
   - recipient: ${recipient}
@@ -41,7 +41,7 @@ async function main() {
         // retrieve from contract storage
         const storedTrade = await contract.matchedTrades(matchedTradeId);
 
-        console.log(`🟢 Stored on-chain matched trade:
+        console.log(`Stored on-chain matched trade:
   - buyIntentId: ${storedTrade.buyIntentId}
   - sellIntentId: ${storedTrade.sellIntentId}
   - recipient: ${storedTrade.recipient}
@@ -52,7 +52,7 @@ async function main() {
 `);
 
         // if you want to pass to HTLC script directly:
-        console.log(`⚡ Pass to HTLC:
+        console.log(`Pass to HTLC:
   - recipient: ${storedTrade.recipient}
   - ethAmount: ${storedTrade.ethAmount}
   - locktime: ${storedTrade.locktime}
