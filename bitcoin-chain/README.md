@@ -34,18 +34,18 @@ Alice will public preimage through json file and send to Bob
 Bob use preimage to create a withdrawHTLC to claim ETH
 
 
-## Step 0.1: Setup Localhost for Ethereum Hardhat
+## Step 1. Start Ethereum Node
 ```bash
 npx hardhat node
 ```
 
-## Step 1: Deploy IntentMatching contract
+## Step 2. Deploy IntentMatching Contract
 ```bash
 npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
 ```
 After deploying, the address of contract will be stored in my-solidity-project/data/intent-matching-address.json
 
-## Step 2: Create the list of BuyIntents and SellIntents
+## Step 3. Create Intents
 Note:
 - Input of BuyIntents and SellIntents is currently implemented in hard code
 ```bash
@@ -53,14 +53,13 @@ npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network lo
 npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost
 ```
 
-## Step 3: Execute Intent Matching process
-Note:
-- Currently, the matchingIntent algorithm still occurs many errors
+## Step 4. Run Intent Matching
 ```bash
 npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost
+
 ```
 
-## Step 4: Deploy HTLC on Ethereum
+## Step 5. Deploy HTLC Contract
 Alice deploys the HTLC contract and retrieves the address.
 
 ```bash
@@ -68,7 +67,7 @@ npx hardhat run localhost-script/htlc/deployHTLC.js --network localhost
 # Output: HTLC contract address
 ```
 
-## Step 5: Create HTLC on Ethereum
+## Step 6. Create HTLC (ETH Lock by Alice)
 Alice creates the HTLC on-chain.
 
 ```bash
@@ -79,84 +78,55 @@ npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
 
 ---
 
-## Step 0.2: Setup Localhost for Bitcoin Core
+## Step 7. Start Bitcoin Chain in tmux
 ```bash
 cd bitcoin-chain
 mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
+```
+
+## Step 8. Initialize Alice and Bob Keys
+```bash
+cd src/payment-channel
+go run main.go init alice
+go run main.go init bob
+```
+
+## Step 9. Fund Bob’s Wallet
+```bash
+cd ../..
 tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
-# Make sure you are in ~/Intent-centric-DEX/bitcoin-chain
 ```
 
-## Step 6: Bob Receives the Hash and create HTLC 
-Alice sends the `sha256(secret)` to Bob.
-Bob uses the hash to generate the corresponding HTLC on Bitcoin.
+## Step 10. Create Multisig Address
 ```bash
-go run ./src/create-HTLC-contract/*.go
+cd src/payment-channel
+go run main.go multisig
 ```
 
-## Step 7: Create Raw BTC Transaction to fund HTLC
-Send BTC from the miner address to Bob.
-
+## Step 11. Fund the Multisig (Off-chain)
 ```bash
-go run ./src/create-raw-transaction/*.go
-# Input: txid (from scantxout), vout, sender address, recipient address
-# Output: raw txid
+go run main.go fund-offchain 10
 ```
 
-## Step 8: Sign the BTC Raw Transaction to fund HTLC
+## Step 12. Set Funding Tx for HTLC
 ```bash
-go run ./src/sign-raw-transaction-with-key/*.go
-# Input: txid, vout, scriptPubKey, amount (from scantxout), redeem script, raw txid, sender private key
-# Output: signed raw txid
+bitcoin-cli decoderawtransaction <signed_funding_tx>
+go run main.go set-htlc-tx <txid> <vout>
 ```
-
-## Step 9: Broadcast the Signed BTC Transaction
+## Step 13. Broadcast Funding Tx
 ```bash
-bitcoin-cli sendrawtransaction <signed_raw_txid>
-# Output: broadcasted txid
-bitcoin-cli scantxoutset start "[\"addr(<address_htlc>)\"]" > ./data-script/utxo-htlc.json
-# Store in utxo-htlc.json
-
+bitcoin-cli sendrawtransaction <signed_funding_tx>
 ```
 
-## Step 10: Alice Claims BTC Using Secret
+## Step 14. Commitment Transaction (Optional for off-chain balance)
 ```bash
-go run ./src/create-redeem-transaction/*.go
-go run ./src/sign-redeem-transaction/*.go
-# Input: txid, vout, recipient address, amount -> create raw transaction
-# Then input: raw txid, secret (preimage), redeem script, recipient private key, recipient public key
-# Output: signed redeem txid
+bitcoin-cli sendrawtransaction <signed_funding_tx>
 ```
-
+## Step 15. Settle (Simulate On-chain)
 ```bash
-bitcoin-cli sendrawtransaction <signed_redeem_txid>
+go run main.go settle
+bitcoin-cli generate 1
 ```
-
----
-
-## Step 11: Alice Reveals the Secret
-Once Alice redeems BTC, the `secret` becomes public on the blockchain.
-
----
-
-## Step 12: Bob Uses Secret to Claim ETH
-Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
-
-```bash
-npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
-# Update withdrawHTLC.js script
-# Input: lockID, secret (preimage), htlcAddress, recipient address
-```
-
-## Step 13: To stop Bitcoin chain
-```bash
-mux stop -p ../.tmuxinator/bitcoin-chain-execute.yml
-tmux kill-session
-```
-
----
-
-> ✅ Atomic swap is complete: BTC to Alice, ETH to Bob
 
 ## Note
 ### Overview
