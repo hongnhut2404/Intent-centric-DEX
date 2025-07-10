@@ -11,7 +11,7 @@ async function main() {
 
   console.log("Matching intents...");
 
-  const matchTx = await contract.matchIntent(2);
+  const matchTx = await contract.matchIntent(0);
   const receipt = await matchTx.wait();
 
   let matchedTradeId;
@@ -24,7 +24,7 @@ async function main() {
         const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] =
           parsed.args;
 
-        console.log(`TradeMatched event:
+        console.log(`✅ TradeMatched event:
   - buyIntentId: ${buyIntentId}
   - sellIntentId: ${sellIntentId}
   - recipient: ${recipient}
