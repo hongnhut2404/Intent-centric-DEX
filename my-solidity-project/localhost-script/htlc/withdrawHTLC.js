@@ -4,45 +4,60 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  // Load HTLC address from IntentMatching
+  const buyIntentId = 0; // Change this as needed
+
+  const secret = readline.question("Enter the shared secret preimage: ");
+  const secretHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
+
+  // Load IntentMatching contract
   const intentJsonPath = path.resolve(__dirname, "../../data/intent-matching-address.json");
   const { address: intentMatchingAddress } = JSON.parse(fs.readFileSync(intentJsonPath));
-
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
+  const HTLC = await hre.ethers.getContractFactory("HTLC");
+
   const intentMatching = await IntentMatching.attach(intentMatchingAddress);
   const htlcAddress = await intentMatching.htlcAddress();
-
-  const HTLC = await hre.ethers.getContractFactory("HTLC");
   const htlc = await HTLC.attach(htlcAddress);
 
-  // 🔍 Fetch the most recent Locked event
-  const filter = htlc.filters.Locked();
-  const events = await htlc.queryFilter(filter, "latest");
+  // Query HTLCAssociated events for this BuyIntent
+  const filter = intentMatching.filters.HTLCAssociated(buyIntentId);
+  const events = await intentMatching.queryFilter(filter);
 
   if (events.length === 0) {
-    throw new Error("No Locked events found.");
+    console.log("No HTLCs associated with this BuyIntent.");
+    return;
   }
 
-  const lastEvent = events[events.length - 1];
-  const { id: lockId, recipient } = lastEvent.args;
+  let successCount = 0;
 
-  // 📥 Ask for secret from user
-  const secret = readline.question("Enter the secret preimage: ");
-  const signer = await hre.ethers.getSigner(recipient);
+  for (const event of events) {
+    const { lockId, recipient } = event.args;
 
-  // 💰 Check balance before
-  const balanceBefore = await hre.ethers.provider.getBalance(recipient);
-  console.log("Balance before:", hre.ethers.formatEther(balanceBefore), "ETH");
+    const signer = await hre.ethers.getSigner(recipient);
+    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
 
-  // 🚀 Withdraw
-  console.log("Withdrawing HTLC for lockId:", lockId);
-  const tx = await htlc.connect(signer).withdraw(lockId, secret);
-  await tx.wait();
-  console.log("Withdrawal successful!");
+    console.log(`Withdrawing HTLC for lockId: ${lockId}`);
+    console.log("Recipient:", recipient);
+    console.log("Balance before:", hre.ethers.formatEther(balanceBefore), "ETH");
 
-  //Check balance after
-  const balanceAfter = await hre.ethers.provider.getBalance(recipient);
-  console.log("Balance after:", hre.ethers.formatEther(balanceAfter), "ETH");
+    try {
+      const tx = await htlc.connect(signer).withdraw(lockId, secret);
+      await tx.wait();
+
+      const balanceAfter = await hre.ethers.provider.getBalance(recipient);
+      console.log("Withdrawal successful.");
+      console.log("Balance after:", hre.ethers.formatEther(balanceAfter), "ETH");
+      successCount++;
+    } catch (err) {
+      console.error("Withdrawal failed:", err.reason || err.message);
+    }
+  }
+
+  if (successCount === 0) {
+    console.log("No HTLCs withdrawn.");
+  } else {
+    console.log(`Withdrawn ${successCount} HTLC(s) for BuyIntent ${buyIntentId}.`);
+  }
 }
 
 main().catch((err) => {
