@@ -120,12 +120,29 @@ bitcoin-cli sendrawtransaction <signed_funding_tx>
 
 ## Step 14. Commitment Transaction (Optional for off-chain balance)
 ```bash
-bitcoin-cli sendrawtransaction <signed_funding_tx>
+go run main.go commit <amount_alice> <amount_bob>
+go run main.go sign-alice
+go run main.go verify
+go run main.go sign-bob yes
 ```
 ## Step 15. Settle (Simulate On-chain)
 ```bash
 go run main.go settle
 bitcoin-cli generate 1
+```
+
+## Step 16: Alice Reveals the Secret
+Once Alice redeems BTC, the `secret` becomes public on the blockchain.
+
+---
+
+## Step 17: Bob Uses Secret to Claim ETH
+Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
+
+```bash
+npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
+# Update withdrawHTLC.js script
+# Input: lockID, secret (preimage), htlcAddress, recipient address
 ```
 
 ## Note
@@ -141,56 +158,47 @@ bitcoin-cli generate 1
 ### Bitcoin
 - Still implemted the amount of BTC in hard code -> need to change into reading the amount from json files
 
-## How to setup the payment channel
+
+## Step 6: Bob Receives the Hash and create HTLC 
+Alice sends the `sha256(secret)` to Bob.
+Bob uses the hash to generate the corresponding HTLC on Bitcoin.
 ```bash
-# 0. Remove the current data folder
+go run ./src/create-HTLC-contract/*.go
+```
 
-# 1. Start tmux session for Bitcoin Core regtest
-cd bitcoin-chain
-mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
+## Step 7: Create Raw BTC Transaction to fund HTLC
+Send BTC from the miner address to Bob.
 
-# 2. Generate Alice and Bob keys (creates data/state.json)
-cd src/payment-channel
-go run main.go init alice
-go run main.go init bob
+```bash
+go run ./src/create-raw-transaction/*.go
+# Input: txid (from scantxout), vout, sender address, recipient address
+# Output: raw txid
+```
 
-# 3. Fund Bob's wallet from miner
-cd ../..
-tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
+## Step 8: Sign the BTC Raw Transaction to fund HTLC
+```bash
+go run ./src/sign-raw-transaction-with-key/*.go
+# Input: txid, vout, scriptPubKey, amount (from scantxout), redeem script, raw txid, sender private key
+# Output: signed raw txid
+```
 
-# 4. Go back to payment-channel
-cd src/payment-channel
-
-
-# 6. Generate 2-of-2 multisig address (redeemScript and address printed)
-go run main.go multisig
-
-# 7. Fund the multisig address (off-chain tx signed by Bob)
-go run main.go fund-offchain 10
-
-# 8. Decode the funding transaction to extract `txid` and `vout`
-bitcoin-cli decoderawtransaction <signed_funding_tx>
-go run main.go set-htlc-tx 9ff1910c7d857a7e887ffc3f87b53f6a388c678d2e573ae929e54dfdcec0f320 0
-
-# 9. Update data/state.json with:
-
-
-# 10. Broadcast the funding transaction
-bitcoin-cli sendrawtransaction <signed_funding_tx>
-
-# 11. Create commitment transaction (off-chain execution #1)
-#Commit 1
-go run main.go commit <amount_alice> <amount_bob> # Alice create commit transaction with balance in OP_RETURN
-go run main.go sign-alice # Alice sign the transaction -> Send to Bob
-go run main.go verify # Bob verify transaction to read the information
-go run main.go sign-bob yes # If Bob agrees -> Sign the transaction
-
-#Commit next
-...
-
-# 13. Broadcast the commitment tx (simulate settlement)
-go run main.go settle
-bitcoin-cli generate 1
+## Step 9: Broadcast the Signed BTC Transaction
+```bash
+bitcoin-cli sendrawtransaction <signed_raw_txid>
+# Output: broadcasted txid
+bitcoin-cli scantxoutset start "[\"addr(<address_htlc>)\"]" > ./data-script/utxo-htlc.json
+# Store in utxo-htlc.json
 
 ```
 
+## Step 10: Alice Claims BTC Using Secret
+```bash
+go run ./src/create-redeem-transaction/*.go
+go run ./src/sign-redeem-transaction/*.go
+# Input: txid, vout, recipient address, amount -> create raw transaction
+# Then input: raw txid, secret (preimage), redeem script, recipient private key, recipient public key
+# Output: signed redeem txid
+```
+
+```bash
+bitcoin-cli sendrawtransaction <signed_redeem_txid>
