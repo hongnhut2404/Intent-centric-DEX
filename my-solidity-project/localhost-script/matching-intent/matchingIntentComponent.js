@@ -1,68 +1,130 @@
-// scripts/matchingIntentComponent.js
 const { ethers } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-  const { address } = JSON.parse(
-    fs.readFileSync("data/intent-matching-address.json")
+  const buyIntentId = parseInt(process.env.BUY_ID);
+  if (isNaN(buyIntentId)) {
+    console.error("Usage: BUY_ID=<id> npx hardhat run ...");
+    process.exit(1);
+  }
+
+  const allSigners = await ethers.getSigners();
+
+  const { address: intentMatchingAddress } = JSON.parse(
+    fs.readFileSync("data/intent-matching-address.json", "utf8")
   );
   const IntentMatching = await ethers.getContractFactory("IntentMatching");
-  const contract = await IntentMatching.attach(address);
+  const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
 
-  console.log("Matching intents...");
+  const intentMatching = IntentMatching.attach(intentMatchingAddress);
+  const multisigAddress = await intentMatching.multisigWallet();
+  const multisig = MultisigWallet.attach(multisigAddress);
 
-  const matchTx = await contract.matchIntent(0);
-  const receipt = await matchTx.wait();
+  console.log(`Multisig wallet (on-chain): ${multisigAddress}`);
 
-  let matchedTradeId;
+  // Encode matchIntent call
+  const data = intentMatching.interface.encodeFunctionData("matchIntent", [buyIntentId]);
 
-  for (const log of receipt.logs) {
-    try {
-      const parsed = contract.interface.parseLog(log);
+  // Submit transaction
+  const submitTx = await multisig
+    .connect(allSigners[1])
+    .submitTransaction(intentMatchingAddress, 0, data);
+  const submitReceipt = await submitTx.wait();
 
-      if (parsed.name === "TradeMatched") {
-        const [buyIntentId, sellIntentId, recipient, token, sender, amountETH, amountBTC, locktime] =
-          parsed.args;
-
-        console.log(`✅ TradeMatched event:
-  - buyIntentId: ${buyIntentId}
-  - sellIntentId: ${sellIntentId}
-  - recipient: ${recipient}
-  - executor(sender): ${sender}
-  - ETH amount: ${ethers.formatEther(amountETH)} ETH
-  - BTC amount: ${Number(amountBTC) / 1e8} BTC
-  - locktime: ${locktime}
-`);
-
-
-        // use matchedTradeCount-1 because it increments after storing
-        matchedTradeId = await contract.matchedTradeCount() - 1n;
-
-        // retrieve from contract storage
-        const storedTrade = await contract.matchedTrades(matchedTradeId);
-
-        console.log(`Stored on-chain matched trade:
-  - buyIntentId: ${storedTrade.buyIntentId}
-  - sellIntentId: ${storedTrade.sellIntentId}
-  - recipient: ${storedTrade.recipient}
-  - ethAmount: ${ethers.formatEther(storedTrade.ethAmount)} ETH
-  - btcAmount: ${Number(storedTrade.btcAmount) / 1e8} BTC
-  - locktime: ${storedTrade.locktime}
-  - timestamp: ${storedTrade.timestamp}
-`);
-
-        // if you want to pass to HTLC script directly:
-        console.log(`Pass to HTLC:
-  - recipient: ${storedTrade.recipient}
-  - ethAmount: ${storedTrade.ethAmount}
-  - locktime: ${storedTrade.locktime}
-        `);
-
+  const parsedSubmitLog = submitReceipt.logs
+    .map(log => {
+      try {
+        return multisig.interface.parseLog(log);
+      } catch {
+        return null;
       }
+    })
+    .find(log => log?.name === "TransactionSubmitted");
+
+  if (!parsedSubmitLog) {
+    console.error("Failed to extract txID from TransactionSubmitted event.");
+    return;
+  }
+
+  const txID = parsedSubmitLog.args.txID;
+  console.log(`matchIntent(${buyIntentId}) submitted via multisig. TxID: ${txID}`);
+
+  const ownerAddresses = await multisig.getOwners();
+  console.log(`Confirming TxID: ${txID} with ${ownerAddresses.length} owners`);
+
+  for (let i = 0; i < ownerAddresses.length; i++) {
+    const signer = allSigners.find(s => s.address === ownerAddresses[i]);
+    if (!signer) continue;
+
+    try {
+      const confirmTx = await multisig.connect(signer).confirmTransaction(txID);
+      await confirmTx.wait();
+      console.log(`Tx ${txID} confirmed by owner ${i + 1} (${signer.address})`);
     } catch (err) {
-      console.error("Log parsing error:", err.message);
+      console.log(`Tx ${txID} already confirmed or failed by owner ${i + 1}: ${err.message}`);
+    }
+  }
+
+  // Try execution
+  try {
+    const executor = allSigners.find(s => ownerAddresses.includes(s.address));
+    const execTx = await multisig.connect(executor).executeTransaction(txID);
+    const receipt = await execTx.wait();
+
+    console.log(`Tx ${txID} executed successfully. Parsing events:`);
+
+    for (const log of receipt.logs) {
+      try {
+        const parsed = intentMatching.interface.parseLog(log);
+        if (parsed.name === "TradeMatched") {
+          const [buyIntentId, sellIntentId, executor, , recipient, ethAmount, btcAmount, locktime] = parsed.args;
+          console.log(`Matched:
+  - BuyIntent ID: ${buyIntentId}
+  - SellIntent ID: ${sellIntentId}
+  - ETH: ${ethers.formatEther(ethAmount)}
+  - BTC: ${Number(btcAmount) / 1e8}
+  - Recipient: ${recipient}
+  - Locktime: ${locktime}`);
+        }
+      } catch { }
+    }
+  } catch (e) {
+    if (e.message.includes("Transaction already executed")) {
+      console.log(`Tx ${txID} already executed automatically.`);
+
+      const latestBlock = await ethers.provider.getBlockNumber();
+      const matchedEvents = await intentMatching.queryFilter(
+        intentMatching.filters.TradeMatched(),
+        latestBlock - 10,  // scan last 10 blocks
+        latestBlock
+      );
+
+
+      if (matchedEvents.length === 0) {
+        console.log("No TradeMatched events found in recent block.");
+      } else {
+        console.log(`Recovered ${matchedEvents.length} TradeMatched events:`);
+
+        for (const event of matchedEvents) {
+          const { buyIntentId, sellIntentId, recipient, sender, ethAmount, btcAmount, locktime } = event.args;
+
+          console.log(`Matched:
+  - BuyIntent ID: ${buyIntentId}
+  - SellIntent ID: ${sellIntentId}
+  - ETH: ${ethers.formatEther(ethAmount)}
+  - BTC: ${Number(btcAmount) / 1e8}
+  - Buyer: ${recipient}
+  - Seller: ${sender}
+  - Locktime: ${locktime}`);
+        }
+      }
+    } else {
+      console.error(`Tx ${txID} execution failed: ${e.message}`);
     }
   }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error("Script failed:", err);
+  process.exit(1);
+});

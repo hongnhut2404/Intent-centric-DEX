@@ -2,29 +2,41 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-    const [deployer, owner1, owner2] = await ethers.getSigners();
+    // Parse number of owners from command line argument
+    const numOwners = parseInt(process.argv[2] || "2");
+    if (isNaN(numOwners) || numOwners < 1) {
+        throw new Error("Usage: node deployMultisigWallet.js <number_of_owners>");
+    }
 
-    // Step 1: Deploy MultisigWallet with n-of-n setup
+    const signers = await ethers.getSigners();
+    if (signers.length < numOwners + 1) {
+        throw new Error(`You need at least ${numOwners + 1} accounts in your Hardhat network`);
+    }
+
+    const deployer = signers[0];
+    const owners = signers.slice(1, numOwners + 1).map(s => s.address);
+    console.log(`Deploying multisig with owners:`, owners);
+
+    // Step 1: Deploy MultisigWallet
     const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-    const multisig = await MultisigWallet.deploy([owner1.address, owner2.address]);
+    const multisig = await MultisigWallet.deploy(owners);
     await multisig.waitForDeployment();
-
     const multisigAddress = await multisig.getAddress();
     console.log("MultisigWallet deployed at:", multisigAddress);
 
-    // Step 2: Load IntentMatching address from JSON
-    const json = fs.readFileSync("data/intent-matching-address.json", "utf8");
-    const { address: intentMatchingAddress } = JSON.parse(json);
+    // Step 2: Load IntentMatching address
+    const { address: intentMatchingAddress } = JSON.parse(
+        fs.readFileSync("data/intent-matching-address.json", "utf8")
+    );
     console.log("IntentMatching loaded from JSON:", intentMatchingAddress);
 
     // Step 3: Store multisig address on-chain
     const intentMatching = await ethers.getContractAt("IntentMatching", intentMatchingAddress);
     const tx = await intentMatching.setMultisigWallet(multisigAddress);
     const receipt = await tx.wait();
-
     console.log("setMultisigWallet() transaction confirmed.");
 
-    // Step 4: Parse the event using contract interface manually
+    // Step 4: Parse event
     const iface = (await ethers.getContractFactory("IntentMatching")).interface;
     const event = receipt.logs
         .map(log => {
@@ -40,7 +52,6 @@ async function main() {
         console.log("Event MultisigWalletUpdated emitted:");
         console.log("  Old wallet:", event.args.oldWallet);
         console.log("  New wallet:", event.args.newWallet);
-
     } else {
         console.warn("No MultisigWalletUpdated event found in logs.");
     }

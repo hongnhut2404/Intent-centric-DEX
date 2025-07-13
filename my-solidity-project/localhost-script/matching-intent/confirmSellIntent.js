@@ -2,9 +2,9 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-  const [deployer, owner1, owner2] = await ethers.getSigners();
+  const allSigners = await ethers.getSigners();
 
-  // Load IntentMatching address
+  // Load IntentMatching contract address
   const { address: intentMatchingAddress } = JSON.parse(
     fs.readFileSync("data/intent-matching-address.json", "utf8")
   );
@@ -12,62 +12,65 @@ async function main() {
   const IntentMatching = await ethers.getContractFactory("IntentMatching");
   const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
 
-  const intentMatching = await IntentMatching.attach(intentMatchingAddress);
+  // Get deployed contract instances
+  const intentMatching = IntentMatching.attach(intentMatchingAddress);
   const multisigAddress = await intentMatching.multisigWallet();
   console.log("Multisig wallet (on-chain):", multisigAddress);
 
-  const multisig = await MultisigWallet.attach(multisigAddress);
+  const multisig = MultisigWallet.attach(multisigAddress);
 
-  // Get current tx count
+  // Fetch owner addresses from on-chain and match with local signers
+  const onChainOwners = await multisig.getOwners();
+  const ownerSigners = onChainOwners
+    .map(addr => allSigners.find(s => s.address.toLowerCase() === addr.toLowerCase()))
+    .filter(Boolean);
+
+  if (ownerSigners.length < onChainOwners.length) {
+    console.warn("⚠️ Some multisig owners are not available in local signers.");
+  }
+
   const txCounter = await multisig.txCounter();
 
   for (let txId = 0; txId < txCounter; txId++) {
     const tx = await multisig.transactions(txId);
-
     if (tx.executed) {
       console.log(`Tx ${txId} already executed ✅`);
       continue;
     }
 
-    // Confirm from owner1
-    try {
-      const tx1 = await multisig.connect(owner1).confirmTransaction(txId);
-      await tx1.wait();
-      console.log(`Tx ${txId} confirmed by owner1`);
-    } catch (e) {
-      console.log(`Tx ${txId} already confirmed by owner1 or failed: ${e.message}`);
-    }
-
-    // Confirm from owner2
-    try {
-      const tx2 = await multisig.connect(owner2).confirmTransaction(txId);
-      await tx2.wait();
-      console.log(`Tx ${txId} confirmed by owner2`);
-    } catch (e) {
-      console.log(`Tx ${txId} already confirmed by owner2 or failed: ${e.message}`);
-    }
-
-    // Fetch updated tx state
-    const updatedTx = await multisig.transactions(txId);
-    if (!updatedTx.executed && updatedTx.confirmationCount.toNumber() === 2) {
+    // Confirm with each available owner
+    for (const signer of ownerSigners) {
       try {
-        const exec = await multisig.connect(owner1).executeTransaction(txId);
-        await exec.wait();
-        console.log(`Tx ${txId} executed ✅`);
+        const confirmTx = await multisig.connect(signer).confirmTransaction(txId);
+        await confirmTx.wait();
+        console.log(`Tx ${txId} confirmed by ${signer.address}`);
       } catch (e) {
-        console.log(`Tx ${txId} execution failed: ${e.message}`);
+        if (e.message.includes("Already confirmed")) {
+          console.log(`Tx ${txId} already confirmed by ${signer.address}`);
+        } else {
+          console.log(`Tx ${txId} confirmation by ${signer.address} failed: ${e.message}`);
+        }
       }
-    } else if (updatedTx.executed) {
-      console.log(`Tx ${txId} already executed ✅`);
-    } else {
-      console.log(`Tx ${txId} not executed (not enough confirmations yet)`);
+    }
+
+    // Attempt to execute the transaction (from first owner)
+    try {
+      const execTx = await multisig.connect(ownerSigners[0]).executeTransaction(txId);
+      await execTx.wait();
+      console.log(`Tx ${txId} executed ✅`);
+    } catch (e) {
+      if (e.message.includes("Transaction already executed")) {
+            console.log(`ℹ️ Tx ${txId} already executed automatically during confirmation`);
+        } else {
+            console.log(`Tx ${txId} execution failed: ${e.message}`);
+        }
     }
   }
 
-  console.log("All pending SellIntents confirmed and executed (if eligible).");
+  console.log("✅ All pending SellIntents confirmed and executed (if eligible).");
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error("Failed to confirm sell intents:", err);
   process.exit(1);
 });

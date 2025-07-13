@@ -15,18 +15,23 @@ async function main() {
   const locktime = Math.floor(Date.now() / 1000) + 3600;
   const offchainId = ethers.encodeBytes32String("buy-eth");
 
-  // Define multiple buy intents (amounts in BTC/ETH, not sat/wei)
   const buyIntents = [
-    { amountBTC: 8.0, minBuyETH: "4.0" }
+    { amountBTC: 8.0, minBuyETH: "4.0", slippagePercent: 10 }
   ];
 
-  for (const { amountBTC, minBuyETH } of buyIntents) {
+  for (const { amountBTC, minBuyETH, slippagePercent } of buyIntents) {
     const sellAmount = BigInt(amountBTC * 1e8); // BTC → satoshi
     const minBuyAmount = hre.ethers.parseUnits(minBuyETH, 18); // ETH → wei
 
     const tx = await contract
       .connect(user1)
-      .createBuyIntent(sellAmount, minBuyAmount, locktime, offchainId);
+      .createBuyIntent(
+        sellAmount,
+        minBuyAmount,
+        locktime,
+        offchainId,
+        slippagePercent
+      );
 
     console.log(`Transaction sent: ${tx.hash}`);
     const receipt = await tx.wait();
@@ -55,6 +60,7 @@ async function main() {
   - sellAmount: ${Number(sellAmount) / 1e8} BTC
   - minBuyAmount: ${hre.ethers.formatEther(minBuyAmount)} ETH
   - locktime: ${emittedLocktime}
+  - slippage: ${slippagePercent}%
           `);
         }
       } catch (e) {

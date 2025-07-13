@@ -53,11 +53,13 @@ Note:
 npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network localhost
 npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost
 npx hardhat run localhost-script/matching-intent/confirmSellIntent.js --network localhost
+npx hardhat run localhost-script/matching-intent/viewAllIntents.js --network localhost
 ```
 
 ## Step 4. Run Intent Matching
 ```bash
-npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost
+BUY_ID=0 npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost
+TX_ID=3 npx hardhat run localhost-script/matching-intent/confirmMultisigTx.js --network localhost
 
 ```
 

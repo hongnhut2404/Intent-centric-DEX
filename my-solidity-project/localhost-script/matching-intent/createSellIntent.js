@@ -3,7 +3,7 @@ const ethers = require("ethers");
 const fs = require("fs");
 
 async function main() {
-  const [_, owner1, owner2] = await hre.ethers.getSigners(); // Use owner1 and owner2
+  const signers = await hre.ethers.getSigners();
 
   const { address: intentMatchingAddress } = JSON.parse(
     fs.readFileSync("data/intent-matching-address.json")
@@ -19,13 +19,23 @@ async function main() {
   const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
   const multisig = MultisigWallet.attach(multisigAddress);
 
+  // Fetch on-chain owner addresses
+  const owners = await multisig.getOwners();
+  console.log("Multisig owners:", owners);
+
+  // Match with signers to get their private keys
+  const signerMap = {};
+  for (const signer of signers) {
+    signerMap[signer.address.toLowerCase()] = signer;
+  }
+
   const deadline = Math.floor(Date.now() / 1000) + 3600;
   const offchainId = ethers.encodeBytes32String("sell-eth");
 
   const sellIntents = [
     { amountBTC: 1.0, minBuyETH: "0.75" },
-    { amountBTC: 3.5, minBuyETH: "2.0" },
-    { amountBTC: 6.0, minBuyETH: "4.2" },
+    { amountBTC: 3.5, minBuyETH: "1.6" },
+    { amountBTC: 6.0, minBuyETH: "3.0" },
   ];
 
   for (let i = 0; i < sellIntents.length; i++) {
@@ -40,8 +50,14 @@ async function main() {
       offchainId,
     ]);
 
+    const ownerSigner = signerMap[owners[0].toLowerCase()];
+    if (!ownerSigner) {
+      console.error(`No signer available for owner ${owners[0]}`);
+      return;
+    }
+
     const tx = await multisig
-      .connect(owner1) // Use owner1 who is actually in the multisig
+      .connect(ownerSigner)
       .submitTransaction(intentMatchingAddress, 0, data);
     const receipt = await tx.wait();
 

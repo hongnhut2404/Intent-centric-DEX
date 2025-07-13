@@ -9,6 +9,7 @@ import "hardhat/console.sol";
 contract IntentMatching is Ownable, ReentrancyGuard {
     enum IntentStatus {
         Pending,
+        Partial,
         Filled,
         Cancelled
     }
@@ -23,6 +24,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 createdAt;
         IntentStatus status;
         bytes32 offchainId;
+        uint256 slippage; // New: slippage percentage (e.g., 5 for 5%)
     }
 
     struct SellIntent {
@@ -136,10 +138,12 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 sellAmount,
         uint256 minBuyAmount,
         uint256 locktime,
-        bytes32 offchainId
+        bytes32 offchainId,
+        uint256 slippage
     ) external returns (uint256) {
         require(sellAmount > 0, "Sell amount must be positive");
         require(locktime > block.timestamp, "Locktime must be in the future");
+        require(slippage <= 100, "Invalid slippage"); // Optional upper bound check
 
         uint256 id = intentCountBuy++;
         buyIntents[id] = BuyIntent({
@@ -149,10 +153,18 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             locktime: locktime,
             createdAt: block.timestamp,
             status: IntentStatus.Pending,
-            offchainId: offchainId
+            offchainId: offchainId,
+            slippage: slippage
         });
 
-        emit BuyIntentCreated(id, msg.sender, sellAmount, minBuyAmount, locktime, offchainId);
+        emit BuyIntentCreated(
+            id,
+            msg.sender,
+            sellAmount,
+            minBuyAmount,
+            locktime,
+            offchainId
+        );
         return id;
     }
 
@@ -176,7 +188,14 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit SellIntentCreated(id, msg.sender, sellAmount, minBuyAmount, deadline, offchainId);
+        emit SellIntentCreated(
+            id,
+            msg.sender,
+            sellAmount,
+            minBuyAmount,
+            deadline,
+            offchainId
+        );
         return id;
     }
 
@@ -186,59 +205,58 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         require(buy.status == IntentStatus.Pending, "BuyIntent not pending");
         require(block.timestamp <= buy.locktime, "BuyIntent expired");
 
-        uint256 totalBTCNeeded = buy.sellAmount;
-        uint256 remainingBTC = totalBTCNeeded;
-        uint256 totalETHPaid = 0;
-        uint256 buyPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+        uint256 remainingBTC = buy.sellAmount;
+        uint256 expectedRate = (buy.minBuyAmount * 1e18) / buy.sellAmount;
+
+        // Calculate slippage bounds
+        uint256 lowerBoundRate = (expectedRate * (100 - buy.slippage)) / 100;
+        uint256 upperBoundRate = expectedRate;
 
         RateEntry[] memory candidates = new RateEntry[](intentCountSell);
         uint256 count = 0;
 
+        // Step 1: Filter valid SellIntents within slippage bounds
         for (uint256 i = 0; i < intentCountSell; i++) {
             SellIntent storage sell = sellIntents[i];
-            if (sell.status != IntentStatus.Pending || block.timestamp > sell.deadline) continue;
+            if (
+                sell.status != IntentStatus.Pending ||
+                block.timestamp > sell.deadline
+            ) continue;
 
-            uint256 sellPrice = (sell.sellAmount * 1e18) / sell.minBuyAmount;
-            if (sellPrice <= buyPrice) {
-                candidates[count++] = RateEntry(i, sellPrice);
+            uint256 sellRate = (sell.minBuyAmount * 1e18) / sell.sellAmount;
+            if (sellRate >= lowerBoundRate && sellRate <= upperBoundRate) {
+                candidates[count++] = RateEntry(i, sellRate);
             }
         }
 
         require(count > 0, "No matching sell intents found");
 
-        for (uint256 m = 0; m < count && remainingBTC > 0; m++) {
-            uint256 bestIdx = m;
-            for (uint256 j = m + 1; j < count; j++) {
-                if (candidates[j].rate < candidates[bestIdx].rate) {
-                    bestIdx = j;
+        // Step 2: Sort by highest sellRate (least favorable to buyer within slippage)
+        for (uint256 i = 0; i < count; i++) {
+            for (uint256 j = i + 1; j < count; j++) {
+                if (candidates[j].rate > candidates[i].rate) {
+                    RateEntry memory temp = candidates[i];
+                    candidates[i] = candidates[j];
+                    candidates[j] = temp;
                 }
             }
-            if (bestIdx != m) {
-                RateEntry memory temp = candidates[m];
-                candidates[m] = candidates[bestIdx];
-                candidates[bestIdx] = temp;
-            }
+        }
 
-            uint256 i = candidates[m].index;
-            SellIntent storage sell = sellIntents[i];
+        uint256 totalETHPaid = 0;
 
-            uint256 matchedBTC = sell.sellAmount >= remainingBTC ? remainingBTC : sell.sellAmount;
-            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) / sell.sellAmount;
+        // Step 3: Match against sorted candidates
+        for (uint256 i = 0; i < count && remainingBTC > 0; i++) {
+            SellIntent storage sell = sellIntents[candidates[i].index];
 
-            emit TradeMatched(
-                buyIntentId,
-                i,
-                msg.sender,
-                address(0),
-                buy.buyer,
-                matchedETH,
-                matchedBTC,
-                buy.locktime
-            );
+            uint256 matchedBTC = sell.sellAmount > remainingBTC
+                ? remainingBTC
+                : sell.sellAmount;
+            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) /
+                sell.sellAmount;
 
             matchedTrades[matchedTradeCount++] = MatchedTrade({
                 buyIntentId: buyIntentId,
-                sellIntentId: i,
+                sellIntentId: candidates[i].index,
                 executor: msg.sender,
                 recipient: buy.buyer,
                 ethAmount: matchedETH,
@@ -247,8 +265,16 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 timestamp: block.timestamp
             });
 
-            remainingBTC -= matchedBTC;
-            totalETHPaid += matchedETH;
+            emit TradeMatched(
+                buyIntentId,
+                candidates[i].index,
+                msg.sender,
+                address(0),
+                buy.buyer,
+                matchedETH,
+                matchedBTC,
+                buy.locktime
+            );
 
             if (matchedBTC == sell.sellAmount) {
                 sell.status = IntentStatus.Filled;
@@ -256,9 +282,19 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 sell.sellAmount -= matchedBTC;
                 sell.minBuyAmount -= matchedETH;
             }
+
+            remainingBTC -= matchedBTC;
+            totalETHPaid += matchedETH;
         }
 
-        buy.status = IntentStatus.Filled;
+        // Step 4: Update BuyIntent status
+        if (remainingBTC == 0) {
+            buy.status = IntentStatus.Filled;
+        } else if (remainingBTC < buy.sellAmount) {
+            buy.status = IntentStatus.Partial;
+            buy.sellAmount = remainingBTC;
+            buy.minBuyAmount -= totalETHPaid;
+        }
     }
 
     // Emit HTLC association
@@ -276,11 +312,15 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         return buyIntents[id];
     }
 
-    function getSellIntent(uint256 id) external view returns (SellIntent memory) {
+    function getSellIntent(
+        uint256 id
+    ) external view returns (SellIntent memory) {
         return sellIntents[id];
     }
 
-    function getMatchedTrade(uint256 id) external view returns (MatchedTrade memory) {
+    function getMatchedTrade(
+        uint256 id
+    ) external view returns (MatchedTrade memory) {
         return matchedTrades[id];
     }
 }
