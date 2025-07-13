@@ -52,13 +52,22 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     uint256 public intentCountBuy;
     uint256 public intentCountSell;
-
-    mapping(uint256 => MatchedTrade) public matchedTrades;
     uint256 public matchedTradeCount;
 
+    mapping(uint256 => MatchedTrade) public matchedTrades;
     mapping(uint256 => BuyIntent) public buyIntents;
     mapping(uint256 => SellIntent) public sellIntents;
 
+    address public multisigWallet;
+    address public htlcAddress;
+
+    // Modifiers
+    modifier onlyMultisig() {
+        require(msg.sender == multisigWallet, "Only multisig wallet can call");
+        _;
+    }
+
+    // Events
     event BuyIntentCreated(
         uint256 indexed intentId,
         address indexed buyer,
@@ -105,16 +114,24 @@ contract IntentMatching is Ownable, ReentrancyGuard {
     );
 
     event NoMatchingSellIntent(uint256 indexed buyIntentId);
-    address public htlcAddress;
+    event MultisigWalletUpdated(address oldWallet, address newWallet);
+    event HTLCAddressUpdated(address oldAddress, address newAddress);
 
-    event HTLCAddressUpdated(address indexed htlcAddress);
+    // Setters
+    function setMultisigWallet(address _wallet) external onlyOwner {
+        require(multisigWallet == address(0), "Multisig already set");
+        require(_wallet != address(0), "Invalid address");
+        emit MultisigWalletUpdated(multisigWallet, _wallet);
+        multisigWallet = _wallet;
+    }
 
     function setHTLCAddress(address _htlc) external onlyOwner {
         require(_htlc != address(0), "Invalid HTLC address");
+        emit HTLCAddressUpdated(htlcAddress, _htlc);
         htlcAddress = _htlc;
-        emit HTLCAddressUpdated(_htlc);
     }
 
+    // Create Buy Intent (open to public)
     function createBuyIntent(
         uint256 sellAmount,
         uint256 minBuyAmount,
@@ -135,23 +152,17 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit BuyIntentCreated(
-            id,
-            msg.sender,
-            sellAmount,
-            minBuyAmount,
-            locktime,
-            offchainId
-        );
+        emit BuyIntentCreated(id, msg.sender, sellAmount, minBuyAmount, locktime, offchainId);
         return id;
     }
 
+    // Create Sell Intent (only by multisig)
     function createSellIntent(
         uint256 sellAmount,
         uint256 minBuyAmount,
         uint256 deadline,
         bytes32 offchainId
-    ) external returns (uint256) {
+    ) external onlyMultisig returns (uint256) {
         require(sellAmount > 0, "Sell amount must be positive");
         require(deadline > block.timestamp, "Deadline must be in the future");
 
@@ -165,46 +176,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit SellIntentCreated(
-            id,
-            msg.sender,
-            sellAmount,
-            minBuyAmount,
-            deadline,
-            offchainId
-        );
+        emit SellIntentCreated(id, msg.sender, sellAmount, minBuyAmount, deadline, offchainId);
         return id;
     }
 
-    function findBestSellIntent(
-        uint256 buyerPrice,
-        uint256 maxIterations
-    ) internal view returns (bool, uint256) {
-        bool found;
-        uint256 bestSellId;
-        uint256 bestSellPrice = type(uint256).max;
-
-        for (uint256 i = 0; i < Math.min(intentCountSell, maxIterations); i++) {
-            SellIntent storage sell = sellIntents[i];
-            if (
-                sell.status != IntentStatus.Pending ||
-                block.timestamp > sell.deadline
-            ) {
-                continue;
-            }
-
-            uint256 sellPrice = (sell.minBuyAmount * 1e18) / sell.sellAmount;
-            if (sellPrice < buyerPrice) continue;
-
-            if (sellPrice < bestSellPrice) {
-                bestSellPrice = sellPrice;
-                bestSellId = i;
-                found = true;
-            }
-        }
-        return (found, bestSellId);
-    }
-
+    // Match logic
     function matchIntent(uint256 buyIntentId) external nonReentrant {
         BuyIntent storage buy = buyIntents[buyIntentId];
         require(buy.status == IntentStatus.Pending, "BuyIntent not pending");
@@ -213,48 +189,30 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 totalBTCNeeded = buy.sellAmount;
         uint256 remainingBTC = totalBTCNeeded;
         uint256 totalETHPaid = 0;
-
         uint256 buyPrice = (buy.minBuyAmount * 1e18) / buy.sellAmount;
 
-        // Step 1: Gather all eligible sell intents
         RateEntry[] memory candidates = new RateEntry[](intentCountSell);
         uint256 count = 0;
 
         for (uint256 i = 0; i < intentCountSell; i++) {
             SellIntent storage sell = sellIntents[i];
-
-            if (
-                sell.status != IntentStatus.Pending ||
-                block.timestamp > sell.deadline
-            ) continue;
+            if (sell.status != IntentStatus.Pending || block.timestamp > sell.deadline) continue;
 
             uint256 sellPrice = (sell.sellAmount * 1e18) / sell.minBuyAmount;
-
             if (sellPrice <= buyPrice) {
                 candidates[count++] = RateEntry(i, sellPrice);
-                console.log("Buy price (ETH/BTC):", buyPrice);
-                console.log(
-                    "Sell price (ETH/BTC) for sellIntent",
-                    i,
-                    ":",
-                    sellPrice
-                );
             }
         }
 
         require(count > 0, "No matching sell intents found");
 
-        // Step 2: Greedy matching (lowest rate first)
         for (uint256 m = 0; m < count && remainingBTC > 0; m++) {
-            // Find lowest rate among remaining
             uint256 bestIdx = m;
             for (uint256 j = m + 1; j < count; j++) {
                 if (candidates[j].rate < candidates[bestIdx].rate) {
                     bestIdx = j;
                 }
             }
-
-            // Swap to sort progressively
             if (bestIdx != m) {
                 RateEntry memory temp = candidates[m];
                 candidates[m] = candidates[bestIdx];
@@ -264,12 +222,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             uint256 i = candidates[m].index;
             SellIntent storage sell = sellIntents[i];
 
-            uint256 matchedBTC = sell.sellAmount >= remainingBTC
-                ? remainingBTC
-                : sell.sellAmount;
-
-            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) /
-                sell.sellAmount;
+            uint256 matchedBTC = sell.sellAmount >= remainingBTC ? remainingBTC : sell.sellAmount;
+            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) / sell.sellAmount;
 
             emit TradeMatched(
                 buyIntentId,
@@ -304,19 +258,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             }
         }
 
-        if (count == 0) {
-            emit NoMatchingSellIntent(buyIntentId);
-            console.log(
-                "No acceptable sell intents found for BuyIntent",
-                buyIntentId
-            );
-            return;
-        }
-
         buy.status = IntentStatus.Filled;
-
-        console.log("BuyIntent matched with best-rate sell intents");
     }
+
+    // Emit HTLC association
     function associateHTLC(
         uint256 buyIntentId,
         bytes32 lockId,
@@ -326,14 +271,16 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         emit HTLCAssociated(buyIntentId, lockId, recipient, secretHash);
     }
 
-
+    // Getters
     function getBuyIntent(uint256 id) external view returns (BuyIntent memory) {
         return buyIntents[id];
     }
 
-    function getSellIntent(
-        uint256 id
-    ) external view returns (SellIntent memory) {
+    function getSellIntent(uint256 id) external view returns (SellIntent memory) {
         return sellIntents[id];
+    }
+
+    function getMatchedTrade(uint256 id) external view returns (MatchedTrade memory) {
+        return matchedTrades[id];
     }
 }

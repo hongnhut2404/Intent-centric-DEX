@@ -1,173 +1,158 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-contract SecureMultiWallet {
-    event FundsDeposited(address indexed depositor, uint amount, uint newBalance);
+contract MultisigWallet {
+    address[] public owners;
+    mapping(address => bool) public isOwner;
+    uint public txCounter;
+
+    struct Transaction {
+        address target;
+        uint value;
+        bytes payload;
+        bool executed;
+        mapping(address => bool) confirmations;
+        uint confirmationCount;
+    }
+
+    mapping(uint => Transaction) public transactions;
+
     event TransactionSubmitted(
-        address indexed initiator,
         uint indexed txID,
         address indexed target,
-        uint amount,
+        uint value,
         bytes payload
     );
-    event TransactionConfirmed(address indexed approver, uint indexed txID);
-    event ConfirmationRevoked(address indexed approver, uint indexed txID);
-    event TransactionExecuted(address indexed executor, uint indexed txID);
+    event TransactionConfirmed(address indexed owner, uint indexed txID);
+    event TransactionExecuted(uint indexed txID);
 
-    address[] public authorizedUsers;
-    mapping(address => bool) public isAuthorized;
-    uint public requiredApprovals;
-
-    struct PendingTransaction {
-        address target;
-        uint amount;
-        bytes payload;
-        bool hasBeenExecuted;
-        uint approvalCount;
-    }
-
-    // mapping from tx ID => approver => bool
-    mapping(uint => mapping(address => bool)) public hasConfirmed;
-
-    PendingTransaction[] public pendingTransactions;
-
-    modifier onlyAuthorized() {
-        require(isAuthorized[msg.sender], "Unauthorized");
+    modifier onlyOwner() {
+        require(isOwner[msg.sender], "Not an owner");
         _;
     }
 
-    modifier transactionExists(uint _txID) {
-        require(_txID < pendingTransactions.length, "Transaction not found");
+    modifier txExists(uint _txID) {
+        require(_txID < txCounter, "Transaction does not exist");
         _;
     }
 
-    modifier notYetExecuted(uint _txID) {
-        require(!pendingTransactions[_txID].hasBeenExecuted, "Transaction already executed");
+    modifier notExecuted(uint _txID) {
+        require(!transactions[_txID].executed, "Transaction already executed");
         _;
     }
 
-    modifier notYetConfirmed(uint _txID) {
-        require(!hasConfirmed[_txID][msg.sender], "Transaction already approved");
-        _;
-    }
-
-    constructor(address[] memory _users, uint _requiredApprovals) {
-        require(_users.length > 0, "Users required");
+    modifier notConfirmed(uint _txID) {
         require(
-            _requiredApprovals > 0 &&
-                _requiredApprovals <= _users.length,
-            "Invalid approval count"
+            !transactions[_txID].confirmations[msg.sender],
+            "Already confirmed"
         );
+        _;
+    }
 
-        for (uint i = 0; i < _users.length; i++) {
-            address user = _users[i];
+    constructor(address[] memory _owners) {
+        require(_owners.length > 0, "Owners required");
+        for (uint i = 0; i < _owners.length; i++) {
+            address owner = _owners[i];
+            require(owner != address(0), "Invalid owner");
+            require(!isOwner[owner], "Owner not unique");
 
-            require(user != address(0), "Invalid user");
-            require(!isAuthorized[user], "Duplicate user");
-
-            isAuthorized[user] = true;
-            authorizedUsers.push(user);
+            isOwner[owner] = true;
+            owners.push(owner);
         }
-
-        requiredApprovals = _requiredApprovals;
     }
 
-    receive() external payable {
-        emit FundsDeposited(msg.sender, msg.value, address(this).balance);
-    }
-
-    function addTransaction(
+    function submitTransaction(
         address _target,
-        uint _amount,
-        bytes memory _payload
-    ) public onlyAuthorized {
-        uint txID = pendingTransactions.length;
+        uint _value,
+        bytes calldata _payload
+    ) external onlyOwner returns (uint txID) {
+        txID = txCounter++;
 
-        pendingTransactions.push(
-            PendingTransaction({
-                target: _target,
-                amount: _amount,
-                payload: _payload,
-                hasBeenExecuted: false,
-                approvalCount: 0
-            })
-        );
+        Transaction storage txn = transactions[txID];
+        txn.target = _target;
+        txn.value = _value;
+        txn.payload = _payload;
+        txn.executed = false;
+        txn.confirmationCount = 0;
 
-        emit TransactionSubmitted(msg.sender, txID, _target, _amount, _payload);
+        emit TransactionSubmitted(txID, _target, _value, _payload);
     }
 
-    function approveTransaction(
-        uint _txID
-    ) public onlyAuthorized transactionExists(_txID) notYetExecuted(_txID) notYetConfirmed(_txID) {
-        PendingTransaction storage pendingTx = pendingTransactions[_txID];
-        pendingTx.approvalCount += 1;
-        hasConfirmed[_txID][msg.sender] = true;
-
-        emit TransactionConfirmed(msg.sender, _txID);
-    }
-
-    function runTransaction(
-        uint _txID
-    ) public onlyAuthorized transactionExists(_txID) notYetExecuted(_txID) {
-        PendingTransaction storage pendingTx = pendingTransactions[_txID];
-
-        require(
-            pendingTx.approvalCount >= requiredApprovals,
-            "Insufficient approvals"
-        );
-
-        pendingTx.hasBeenExecuted = true;
-
-        (bool success, ) = pendingTx.target.call{value: pendingTx.amount}(
-            pendingTx.payload
-        );
-        require(success, "Transaction execution failed");
-
-        emit TransactionExecuted(msg.sender, _txID);
-    }
-
-    function retractApproval(
-        uint _txID
-    ) public onlyAuthorized transactionExists(_txID) notYetExecuted(_txID) {
-        PendingTransaction storage pendingTx = pendingTransactions[_txID];
-
-        require(hasConfirmed[_txID][msg.sender], "No prior approval found");
-
-        pendingTx.approvalCount -= 1;
-        hasConfirmed[_txID][msg.sender] = false;
-
-        emit ConfirmationRevoked(msg.sender, _txID);
-    }
-
-    function listUsers() public view returns (address[] memory) {
-        return authorizedUsers;
-    }
-
-    function countTransactions() public view returns (uint) {
-        return pendingTransactions.length;
-    }
-
-    function fetchTransaction(
+    function confirmTransaction(
         uint _txID
     )
-        public
+        external
+        onlyOwner
+        txExists(_txID)
+        notExecuted(_txID)
+        notConfirmed(_txID)
+    {
+        Transaction storage txn = transactions[_txID];
+        txn.confirmations[msg.sender] = true;
+        txn.confirmationCount++;
+
+        emit TransactionConfirmed(msg.sender, _txID);
+
+        if (txn.confirmationCount == owners.length) {
+            executeTransaction(_txID);
+        }
+    }
+    function isExecuted(uint _txID) external view returns (bool) {
+        require(_txID < txCounter, "Transaction does not exist");
+        return transactions[_txID].executed;
+    }
+    function getTransaction(
+        uint _txID
+    )
+        external
         view
         returns (
             address target,
-            uint amount,
+            uint value,
             bytes memory payload,
-            bool hasBeenExecuted,
-            uint approvalCount
+            bool executed,
+            uint confirmationCount
         )
     {
-        PendingTransaction storage pendingTx = pendingTransactions[_txID];
-
+        require(_txID < txCounter, "Transaction does not exist");
+        Transaction storage txn = transactions[_txID];
         return (
-            pendingTx.target,
-            pendingTx.amount,
-            pendingTx.payload,
-            pendingTx.hasBeenExecuted,
-            pendingTx.approvalCount
+            txn.target,
+            txn.value,
+            txn.payload,
+            txn.executed,
+            txn.confirmationCount
         );
     }
+
+    function isConfirmed(
+        uint _txID,
+        address owner
+    ) external view returns (bool) {
+        require(_txID < txCounter, "Transaction does not exist");
+        return transactions[_txID].confirmations[owner];
+    }
+
+    function executeTransaction(
+        uint _txID
+    ) public onlyOwner txExists(_txID) notExecuted(_txID) {
+        Transaction storage txn = transactions[_txID];
+        require(
+            txn.confirmationCount == owners.length,
+            "Not enough confirmations"
+        );
+
+        txn.executed = true;
+        (bool success, ) = txn.target.call{value: txn.value}(txn.payload);
+        require(success, "Transaction execution failed");
+
+        emit TransactionExecuted(_txID);
+    }
+
+    // View helper to get all owners
+    function getOwners() external view returns (address[] memory) {
+        return owners;
+    }
+
+    receive() external payable {}
 }

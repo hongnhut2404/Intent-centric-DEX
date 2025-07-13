@@ -42,6 +42,7 @@ npx hardhat node
 ## Step 2. Deploy IntentMatching Contract
 ```bash
 npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
+npx hardhat run localhost-script/matching-intent/deployMultisigWallet.js --network localhost
 ```
 After deploying, the address of contract will be stored in my-solidity-project/data/intent-matching-address.json
 
@@ -51,6 +52,7 @@ Note:
 ```bash
 npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network localhost
 npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost
+npx hardhat run localhost-script/matching-intent/confirmSellIntent.js --network localhost
 ```
 
 ## Step 4. Run Intent Matching
