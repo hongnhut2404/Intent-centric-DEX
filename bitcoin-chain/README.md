@@ -68,6 +68,7 @@ Alice deploys the HTLC contract and retrieves the address.
 
 ```bash
 npx hardhat run localhost-script/htlc/deployHTLC.js --network localhost
+npx hardhat run localhost-script/htlc/fund.js --network localhost
 # Output: HTLC contract address
 ```
 
@@ -76,6 +77,7 @@ Alice creates the HTLC on-chain.
 
 ```bash
 npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
+npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost
 # Input: htlcAddress, recipient address, timelock
 # Output: secret (preimage), hash(secret) (sha256)
 ```

@@ -3,15 +3,29 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
+  const allSigners = await hre.ethers.getSigners();
+
+  // Load contract addresses
   const intentJsonPath = path.resolve(__dirname, "../../data/intent-matching-address.json");
   const { address: intentMatchingAddress } = JSON.parse(fs.readFileSync(intentJsonPath));
-
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
+  const HTLC = await hre.ethers.getContractFactory("HTLC");
+  const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
+
   const intentMatching = await IntentMatching.attach(intentMatchingAddress);
   const htlcAddress = await intentMatching.htlcAddress();
-
-  const HTLC = await hre.ethers.getContractFactory("HTLC");
   const htlc = await HTLC.attach(htlcAddress);
+  const multisigAddress = await intentMatching.multisigWallet();
+  const multisig = await MultisigWallet.attach(multisigAddress);
+
+  const ownerAddresses = await multisig.getOwners();
+  const localOwners = ownerAddresses.map(addr => allSigners.find(s => s.address === addr)).filter(Boolean);
+
+  if (localOwners.length < 2) {
+    throw new Error("Not enough local multisig owners found.");
+  }
+
+  const [submitter, confirmer] = localOwners;
 
   const lockedEvents = await htlc.queryFilter(htlc.filters.Locked());
 
@@ -20,6 +34,7 @@ async function main() {
     return;
   }
 
+  const now = Math.floor(Date.now() / 1000);
   let refundedCount = 0;
 
   for (const event of lockedEvents) {
@@ -31,27 +46,46 @@ async function main() {
       continue;
     }
 
-    const currentTime = Math.floor(Date.now() / 1000);
-    if (currentTime < lock.timelock) {
+    if (now < lock.timelock) {
       console.log(`Skipping lockId ${lockId}: not yet expired (timelock = ${lock.timelock})`);
       continue;
     }
 
-    const signer = await hre.ethers.getSigner(sender);
     const balanceBefore = await hre.ethers.provider.getBalance(sender);
+    console.log(`Refunding lockId ${lockId} for sender ${sender}`);
+    console.log("Amount:", hre.ethers.formatEther(lock.amount), "ETH");
+    console.log("Balance before:", hre.ethers.formatEther(balanceBefore), "ETH");
 
-    console.log(`Refunding lockId: ${lockId}`);
-    console.log("Sender:  ", sender);
-    console.log("Amount:  ", hre.ethers.formatEther(lock.amount), "ETH");
+    const calldata = htlc.interface.encodeFunctionData("refund", [lockId]);
 
     try {
-      const tx = await htlc.connect(signer).refund(lockId);
-      await tx.wait();
+      const submitTx = await multisig.connect(submitter).submitTransaction(htlcAddress, 0, calldata);
+      const receipt = await submitTx.wait();
+
+      const txID = receipt.logs
+        .map((log) => {
+          try {
+            return multisig.interface.parseLog(log);
+          } catch {
+            return null;
+          }
+        })
+        .find((log) => log?.name === "TransactionSubmitted")?.args.txID;
+
+      if (txID === undefined) {
+        console.error("Failed to extract txID");
+        continue;
+      }
+
+      await multisig.connect(confirmer).confirmTransaction(txID);
+      const execTx = await multisig.connect(submitter).executeTransaction(txID);
+      await execTx.wait();
 
       const balanceAfter = await hre.ethers.provider.getBalance(sender);
       console.log("Refund successful.");
-      console.log("Balance before:", hre.ethers.formatEther(balanceBefore));
-      console.log("Balance after: ", hre.ethers.formatEther(balanceAfter));
+      console.log("Balance after:", hre.ethers.formatEther(balanceAfter), "ETH");
+      console.log("Refunded:", hre.ethers.formatEther(balanceAfter - balanceBefore), "ETH");
+
       refundedCount++;
     } catch (err) {
       console.error(`Refund failed for lockId ${lockId}:`, err.reason || err.message);
@@ -59,9 +93,9 @@ async function main() {
   }
 
   if (refundedCount === 0) {
-    console.log("\nNo refundable HTLCs found.");
+    console.log("No refundable HTLCs found.");
   } else {
-    console.log(`\nRefunded ${refundedCount} HTLC(s).`);
+    console.log(`Refunded ${refundedCount} HTLC(s).`);
   }
 }
 

@@ -77,14 +77,18 @@ async function main() {
       try {
         const parsed = intentMatching.interface.parseLog(log);
         if (parsed.name === "TradeMatched") {
-          const [buyIntentId, sellIntentId, executor, , recipient, ethAmount, btcAmount, locktime] = parsed.args;
+          const [buyIntentId, sellIntentId, executor, seller, buyer, ethAmount, btcAmount, locktime] = parsed.args;
+
           console.log(`Matched:
   - BuyIntent ID: ${buyIntentId}
   - SellIntent ID: ${sellIntentId}
+  - Executor: ${executor}
+  - Buyer: ${buyer}
+  - Seller: ${seller}
   - ETH: ${ethers.formatEther(ethAmount)}
   - BTC: ${Number(btcAmount) / 1e8}
-  - Recipient: ${recipient}
   - Locktime: ${locktime}`);
+
         }
       } catch { }
     }
@@ -106,17 +110,24 @@ async function main() {
         console.log(`Recovered ${matchedEvents.length} TradeMatched events:`);
 
         for (const event of matchedEvents) {
-          const { buyIntentId, sellIntentId, recipient, sender, ethAmount, btcAmount, locktime } = event.args;
+          try {
+            const parsed = intentMatching.interface.parseLog(event);
+            const [buyIntentId, sellIntentId, executor, seller, buyer, ethAmount, btcAmount, locktime] = parsed.args;
 
-          console.log(`Matched:
-  - BuyIntent ID: ${buyIntentId}
-  - SellIntent ID: ${sellIntentId}
-  - ETH: ${ethers.formatEther(ethAmount)}
-  - BTC: ${Number(btcAmount) / 1e8}
-  - Buyer: ${recipient}
-  - Seller: ${sender}
-  - Locktime: ${locktime}`);
+            console.log(`Matched:
+              - BuyIntent ID: ${buyIntentId}
+              - SellIntent ID: ${sellIntentId}
+              - Executor: ${executor}
+              - Buyer: ${buyer}
+              - Seller: ${seller}
+              - ETH: ${ethers.formatEther(ethAmount)}
+              - BTC: ${Number(btcAmount) / 1e8}
+              - Locktime: ${locktime}`);
+          } catch (e) {
+            console.warn(`Failed to parse log: ${e.message}`);
+          }
         }
+
       }
     } else {
       console.error(`Tx ${txID} execution failed: ${e.message}`);

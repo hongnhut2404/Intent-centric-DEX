@@ -2,10 +2,16 @@ const { ethers } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-    // Parse number of owners from command line argument
+    // Read optional command-line arguments
     const numOwners = parseInt(process.argv[2] || "2");
+    const numRequired = parseInt(process.argv[3] || "2");
+
     if (isNaN(numOwners) || numOwners < 1) {
-        throw new Error("Usage: node deployMultisigWallet.js <number_of_owners>");
+        throw new Error("Invalid number of owners. Usage: node deployMultisigWallet.js [numOwners] [numRequiredConfirmations]");
+    }
+
+    if (isNaN(numRequired) || numRequired < 1 || numRequired > numOwners) {
+        throw new Error("Invalid number of required confirmations. It must be between 1 and numOwners.");
     }
 
     const signers = await ethers.getSigners();
@@ -15,11 +21,11 @@ async function main() {
 
     const deployer = signers[0];
     const owners = signers.slice(1, numOwners + 1).map(s => s.address);
-    console.log(`Deploying multisig with owners:`, owners);
+    console.log(`Deploying ${numRequired}-of-${numOwners} multisig with owners:`, owners);
 
     // Step 1: Deploy MultisigWallet
     const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
-    const multisig = await MultisigWallet.deploy(owners);
+    const multisig = await MultisigWallet.deploy(owners, numRequired);
     await multisig.waitForDeployment();
     const multisigAddress = await multisig.getAddress();
     console.log("MultisigWallet deployed at:", multisigAddress);
@@ -36,27 +42,7 @@ async function main() {
     const receipt = await tx.wait();
     console.log("setMultisigWallet() transaction confirmed.");
 
-    // Step 4: Parse event
-    const iface = (await ethers.getContractFactory("IntentMatching")).interface;
-    const event = receipt.logs
-        .map(log => {
-            try {
-                return iface.parseLog(log);
-            } catch {
-                return null;
-            }
-        })
-        .find(parsed => parsed?.name === "MultisigWalletUpdated");
-
-    if (event) {
-        console.log("Event MultisigWalletUpdated emitted:");
-        console.log("  Old wallet:", event.args.oldWallet);
-        console.log("  New wallet:", event.args.newWallet);
-    } else {
-        console.warn("No MultisigWalletUpdated event found in logs.");
-    }
-
-    // Step 5: Double-check value is stored
+    // Step 4: Confirm stored value
     const onChainAddress = await intentMatching.multisigWallet();
     if (onChainAddress === multisigAddress) {
         console.log("Verified: multisigWallet address set correctly on-chain.");

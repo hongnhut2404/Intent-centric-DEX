@@ -91,9 +91,9 @@ contract IntentMatching is Ownable, ReentrancyGuard {
     event TradeMatched(
         uint256 indexed buyIntentId,
         uint256 indexed sellIntentId,
-        address executor,
-        address token,
-        address recipient,
+        address indexed executor,
+        address seller,
+        address buyer,
         uint256 ethAmount,
         uint256 btcAmount,
         uint256 locktime
@@ -269,7 +269,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 buyIntentId,
                 candidates[i].index,
                 msg.sender,
-                address(0),
+                sell.seller,
                 buy.buyer,
                 matchedETH,
                 matchedBTC,

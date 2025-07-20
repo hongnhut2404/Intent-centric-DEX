@@ -1,121 +1,91 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
 const fs = require("fs");
+const path = require("path");
 
 async function main() {
-  const allSigners = await ethers.getSigners();
+  const buyIntentId = parseInt(process.env.BUY_ID || "0");
 
+  const allSigners = await hre.ethers.getSigners();
   const { address: intentMatchingAddress } = JSON.parse(
     fs.readFileSync("data/intent-matching-address.json", "utf8")
   );
-  const IntentMatching = await ethers.getContractFactory("IntentMatching");
-  const intentMatching = await IntentMatching.attach(intentMatchingAddress);
 
+  const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
+  const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
+
+  const intentMatching = await IntentMatching.attach(intentMatchingAddress);
   const multisigAddress = await intentMatching.multisigWallet();
-  const MultisigWallet = await ethers.getContractFactory("MultisigWallet");
   const multisig = await MultisigWallet.attach(multisigAddress);
 
-  const txId = parseInt(process.env.TX_ID);
-  if (isNaN(txId)) {
-    console.error("Please provide TX_ID as an environment variable.");
-    process.exit(1);
+  // Fetch owners
+  const owners = await multisig.getOwners();
+  const ownerSigners = owners
+    .map((addr) => allSigners.find((s) => s.address.toLowerCase() === addr.toLowerCase()))
+    .filter(Boolean);
+
+  if (ownerSigners.length !== owners.length) {
+    console.warn("Some multisig owners are not available locally.");
   }
 
-  const ownerAddresses = await multisig.getOwners();
-  console.log(`Multisig wallet (on-chain): ${multisigAddress}`);
-  console.log(`Confirming TxID: ${txId} with ${ownerAddresses.length} owners`);
+  const txCounter = await multisig.txCounter();
+  const targetTxID = txCounter - 1n; // Assuming matchIntent is the most recent
 
-  for (let i = 0; i < ownerAddresses.length; i++) {
-    const addr = ownerAddresses[i];
-    const signer = allSigners.find((s) => s.address === addr);
+  console.log(`Confirming TxID: ${targetTxID} with ${ownerSigners.length} owners`);
 
-    if (!signer) {
-      console.warn(`Signer for owner ${addr} not found in local accounts`);
-      continue;
-    }
-
+  for (const signer of ownerSigners) {
     try {
-      const tx = await multisig.connect(signer).confirmTransaction(txId);
+      const tx = await multisig.connect(signer).confirmTransaction(targetTxID);
       await tx.wait();
-      console.log(`Tx ${txId} confirmed by owner ${i + 1} (${addr})`);
-    } catch (e) {
-      console.log(`Tx ${txId} already confirmed by owner ${i + 1} or failed: ${e.message}`);
-    }
-  }
-
-  const { executed } = await multisig.transactions(txId);
-  const executor = allSigners.find((s) => ownerAddresses.includes(s.address));
-
-  if (!executor) {
-    console.error("No valid signer available to execute the transaction.");
-    process.exit(1);
-  }
-
-  if (!executed) {
-    try {
-      const execTx = await multisig.connect(executor).executeTransaction(txId);
-      const receipt = await execTx.wait();
-
-      const blockNumber = receipt.blockNumber;
-      console.log(`Tx ${txId} executed successfully in block ${blockNumber}.`);
-
-      // Query TradeMatched events in that block
-      const events = await intentMatching.queryFilter(
-        intentMatching.filters.TradeMatched(),
-        blockNumber,
-        blockNumber
-      );
-
-      if (events.length === 0) {
-        console.log("No TradeMatched events found in execution block.");
+      console.log(`Tx ${targetTxID} confirmed by ${signer.address}`);
+    } catch (err) {
+      if ((err.message || "").includes("Already confirmed")) {
+        console.log(`Tx ${targetTxID} already confirmed by ${signer.address}`);
       } else {
-        console.log(`Recovered ${events.length} TradeMatched events:`);
-        for (const event of events) {
-          const { buyIntentId, sellIntentId, recipient, sender, ethAmount, btcAmount, locktime } = event.args;
-
-          console.log(`Matched:
-  - BuyIntent ID: ${buyIntentId}
-  - SellIntent ID: ${sellIntentId}
-  - Buyer: ${recipient}
-  - Seller: ${sender}
-  - ETH: ${ethers.formatEther(ethAmount)}
-  - BTC: ${Number(btcAmount) / 1e8}
-  - Locktime: ${locktime}`);
-        }
+        console.warn(`Confirmation by ${signer.address} failed: ${err.message}`);
       }
-
-      return;
-    } catch (e) {
-      console.error(`Tx ${txId} execution failed: ${e.message}`);
-      return;
     }
   }
 
-  // Fallback if already executed earlier
-  console.log(`Tx ${txId} already executed automatically during confirmation.`);
+  // Attempt execution
+  try {
+    const execTx = await multisig.connect(ownerSigners[0]).executeTransaction(targetTxID);
+    const receipt = await execTx.wait();
+    console.log(`Tx ${targetTxID} executed.`);
 
-  // Try recovering matched trades by scanning recent blocks
-  const latestBlock = await ethers.provider.getBlockNumber();
-  const matchedEvents = await intentMatching.queryFilter(
-    intentMatching.filters.TradeMatched(),
-    latestBlock - 10,
-    latestBlock
-  );
+    const iface = intentMatching.interface;
+    const logs = receipt.logs
+      .map((log) => {
+        try {
+          return iface.parseLog(log);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .filter((e) => e.name === "TradeMatched");
 
-  if (matchedEvents.length === 0) {
-    console.log("No TradeMatched events found in recent blocks.");
-  } else {
-    console.log(`Recovered ${matchedEvents.length} TradeMatched events from recent blocks:`);
-    for (const event of matchedEvents) {
-      const { buyIntentId, sellIntentId, recipient, sender, ethAmount, btcAmount, locktime } = event.args;
-
-      console.log(`Matched:
-  - BuyIntent ID: ${buyIntentId}
-  - SellIntent ID: ${sellIntentId}
-  - Buyer: ${recipient}
-  - Seller: ${sender}
-  - ETH: ${ethers.formatEther(ethAmount)}
-  - BTC: ${Number(btcAmount) / 1e8}
-  - Locktime: ${locktime}`);
+    if (logs.length > 0) {
+      console.log(`Recovered ${logs.length} TradeMatched events:`);
+      for (const e of logs) {
+        const t = e.args;
+        console.log(`Matched:
+  - BuyIntent ID: ${t.buyIntentId}
+  - SellIntent ID: ${t.sellIntentId}
+  - Executor: ${t.executor}
+  - Buyer: ${t.buyer}
+  - Seller: ${t.seller}
+  - ETH: ${hre.ethers.formatEther(t.ethAmount)}
+  - BTC: ${t.btcAmount}
+  - Locktime: ${t.locktime}`);
+      }
+    } else {
+      console.warn("No TradeMatched events found.");
+    }
+  } catch (err) {
+    if ((err.message || "").includes("already executed")) {
+      console.log(`Tx ${targetTxID} already executed.`);
+    } else {
+      console.error(`Execution failed: ${err.message}`);
     }
   }
 }

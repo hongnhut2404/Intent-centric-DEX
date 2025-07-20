@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 contract MultisigWallet {
     address[] public owners;
     mapping(address => bool) public isOwner;
+    uint public required;
+
     uint public txCounter;
 
     struct Transaction {
@@ -11,18 +13,12 @@ contract MultisigWallet {
         uint value;
         bytes payload;
         bool executed;
-        mapping(address => bool) confirmations;
-        uint confirmationCount;
     }
 
     mapping(uint => Transaction) public transactions;
+    mapping(uint => mapping(address => bool)) public confirmations;
 
-    event TransactionSubmitted(
-        uint indexed txID,
-        address indexed target,
-        uint value,
-        bytes payload
-    );
+    event TransactionSubmitted(uint indexed txID, address indexed target, uint value, bytes payload);
     event TransactionConfirmed(address indexed owner, uint indexed txID);
     event TransactionExecuted(uint indexed txID);
 
@@ -42,15 +38,14 @@ contract MultisigWallet {
     }
 
     modifier notConfirmed(uint _txID) {
-        require(
-            !transactions[_txID].confirmations[msg.sender],
-            "Already confirmed"
-        );
+        require(!confirmations[_txID][msg.sender], "Already confirmed");
         _;
     }
 
-    constructor(address[] memory _owners) {
+    constructor(address[] memory _owners, uint _required) {
         require(_owners.length > 0, "Owners required");
+        require(_required > 0 && _required <= _owners.length, "Invalid required confirmations");
+
         for (uint i = 0; i < _owners.length; i++) {
             address owner = _owners[i];
             require(owner != address(0), "Invalid owner");
@@ -59,6 +54,8 @@ contract MultisigWallet {
             isOwner[owner] = true;
             owners.push(owner);
         }
+
+        required = _required;
     }
 
     function submitTransaction(
@@ -68,88 +65,65 @@ contract MultisigWallet {
     ) external onlyOwner returns (uint txID) {
         txID = txCounter++;
 
-        Transaction storage txn = transactions[txID];
-        txn.target = _target;
-        txn.value = _value;
-        txn.payload = _payload;
-        txn.executed = false;
-        txn.confirmationCount = 0;
+        transactions[txID] = Transaction({
+            target: _target,
+            value: _value,
+            payload: _payload,
+            executed: false
+        });
 
         emit TransactionSubmitted(txID, _target, _value, _payload);
     }
 
-    function confirmTransaction(
-        uint _txID
-    )
+    function confirmTransaction(uint _txID)
         external
         onlyOwner
         txExists(_txID)
         notExecuted(_txID)
         notConfirmed(_txID)
     {
-        Transaction storage txn = transactions[_txID];
-        txn.confirmations[msg.sender] = true;
-        txn.confirmationCount++;
-
+        confirmations[_txID][msg.sender] = true;
         emit TransactionConfirmed(msg.sender, _txID);
+    }
 
-        if (txn.confirmationCount == owners.length) {
-            executeTransaction(_txID);
-        }
-    }
-    function isExecuted(uint _txID) external view returns (bool) {
-        require(_txID < txCounter, "Transaction does not exist");
-        return transactions[_txID].executed;
-    }
-    function getTransaction(
-        uint _txID
-    )
-        external
-        view
-        returns (
-            address target,
-            uint value,
-            bytes memory payload,
-            bool executed,
-            uint confirmationCount
-        )
+    function executeTransaction(uint _txID)
+        public
+        onlyOwner
+        txExists(_txID)
+        notExecuted(_txID)
     {
-        require(_txID < txCounter, "Transaction does not exist");
+        uint count = getConfirmationCount(_txID);
+        require(count >= required, "Not enough confirmations");
+
         Transaction storage txn = transactions[_txID];
-        return (
-            txn.target,
-            txn.value,
-            txn.payload,
-            txn.executed,
-            txn.confirmationCount
-        );
-    }
-
-    function isConfirmed(
-        uint _txID,
-        address owner
-    ) external view returns (bool) {
-        require(_txID < txCounter, "Transaction does not exist");
-        return transactions[_txID].confirmations[owner];
-    }
-
-    function executeTransaction(
-        uint _txID
-    ) public onlyOwner txExists(_txID) notExecuted(_txID) {
-        Transaction storage txn = transactions[_txID];
-        require(
-            txn.confirmationCount == owners.length,
-            "Not enough confirmations"
-        );
-
         txn.executed = true;
+
         (bool success, ) = txn.target.call{value: txn.value}(txn.payload);
         require(success, "Transaction execution failed");
 
         emit TransactionExecuted(_txID);
     }
 
-    // View helper to get all owners
+    function getConfirmationCount(uint _txID) public view returns (uint count) {
+        require(_txID < txCounter, "Transaction does not exist");
+
+        for (uint i = 0; i < owners.length; i++) {
+            if (confirmations[_txID][owners[i]]) {
+                count += 1;
+            }
+        }
+    }
+
+    function isConfirmed(uint _txID, address owner) external view returns (bool) {
+        require(_txID < txCounter, "Transaction does not exist");
+        return confirmations[_txID][owner];
+    }
+
+    function isExecuted(uint _txID) external view returns (bool) {
+        require(_txID < txCounter, "Transaction does not exist");
+        return transactions[_txID].executed;
+    }
+
     function getOwners() external view returns (address[] memory) {
         return owners;
     }

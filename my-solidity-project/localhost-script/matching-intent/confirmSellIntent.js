@@ -26,7 +26,7 @@ async function main() {
     .filter(Boolean);
 
   if (ownerSigners.length < onChainOwners.length) {
-    console.warn("⚠️ Some multisig owners are not available in local signers.");
+    console.warn("Some multisig owners are not available in local signers.");
   }
 
   const txCounter = await multisig.txCounter();
@@ -34,7 +34,7 @@ async function main() {
   for (let txId = 0; txId < txCounter; txId++) {
     const tx = await multisig.transactions(txId);
     if (tx.executed) {
-      console.log(`Tx ${txId} already executed ✅`);
+      console.log(`Tx ${txId} already executed`);
       continue;
     }
 
@@ -57,10 +57,10 @@ async function main() {
     try {
       const execTx = await multisig.connect(ownerSigners[0]).executeTransaction(txId);
       await execTx.wait();
-      console.log(`Tx ${txId} executed ✅`);
+      console.log(`Tx ${txId} executed`);
     } catch (e) {
       if (e.message.includes("Transaction already executed")) {
-            console.log(`ℹ️ Tx ${txId} already executed automatically during confirmation`);
+            console.log(`Tx ${txId} already executed automatically during confirmation`);
         } else {
             console.log(`Tx ${txId} execution failed: ${e.message}`);
         }

@@ -1,67 +1,70 @@
 const hre = require("hardhat");
-const ethers = require("ethers");
 const fs = require("fs");
 
 async function main() {
   const signers = await hre.ethers.getSigners();
 
+  // Load IntentMatching contract address
   const { address: intentMatchingAddress } = JSON.parse(
-    fs.readFileSync("data/intent-matching-address.json")
+    fs.readFileSync("data/intent-matching-address.json", "utf8")
   );
 
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
-  const contract = IntentMatching.attach(intentMatchingAddress);
+  const contract = await IntentMatching.attach(intentMatchingAddress);
 
-  // Get multisig from contract storage
+  // Get multisig wallet address from contract storage
   const multisigAddress = await contract.multisigWallet();
   console.log("Multisig wallet (on-chain):", multisigAddress);
 
   const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
-  const multisig = MultisigWallet.attach(multisigAddress);
+  const multisig = await MultisigWallet.attach(multisigAddress);
 
-  // Fetch on-chain owner addresses
+  // Get on-chain owners of the multisig
   const owners = await multisig.getOwners();
   console.log("Multisig owners:", owners);
 
-  // Match with signers to get their private keys
+  // Map on-chain owners to local Hardhat signers
   const signerMap = {};
   for (const signer of signers) {
     signerMap[signer.address.toLowerCase()] = signer;
   }
 
-  const deadline = Math.floor(Date.now() / 1000) + 3600;
-  const offchainId = ethers.encodeBytes32String("sell-eth");
+  const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+  const offchainId = hre.ethers.encodeBytes32String("sell-eth");
 
+  // Define sell intents
   const sellIntents = [
     { amountBTC: 1.0, minBuyETH: "0.75" },
     { amountBTC: 3.5, minBuyETH: "1.6" },
-    { amountBTC: 6.0, minBuyETH: "3.0" },
+    { amountBTC: 6.0, minBuyETH: "3.0" }
   ];
 
   for (let i = 0; i < sellIntents.length; i++) {
     const { amountBTC, minBuyETH } = sellIntents[i];
-    const sellAmount = BigInt(amountBTC * 1e8); // BTC in sat
+
+    const sellAmount = BigInt(amountBTC * 1e8); // BTC in satoshis
     const minBuyAmount = hre.ethers.parseUnits(minBuyETH, 18); // ETH in wei
 
     const data = contract.interface.encodeFunctionData("createSellIntent", [
       sellAmount,
       minBuyAmount,
       deadline,
-      offchainId,
+      offchainId
     ]);
 
     const ownerSigner = signerMap[owners[0].toLowerCase()];
     if (!ownerSigner) {
-      console.error(`No signer available for owner ${owners[0]}`);
+      console.error(`No signer found for owner ${owners[0]}`);
       return;
     }
 
     const tx = await multisig
       .connect(ownerSigner)
       .submitTransaction(intentMatchingAddress, 0, data);
+
     const receipt = await tx.wait();
 
-    const event = receipt.logs
+    const parsed = receipt.logs
       .map((log) => {
         try {
           return multisig.interface.parseLog(log);
@@ -71,14 +74,17 @@ async function main() {
       })
       .find((e) => e?.name === "TransactionSubmitted");
 
-    if (event) {
-      console.log(`SellIntent ${i} submitted via multisig. TxID: ${event.args.txID}`);
+    if (parsed) {
+      console.log(`SellIntent ${i} submitted via multisig. TxID: ${parsed.args.txID}`);
     } else {
-      console.log(`SellIntent ${i} submitted (no event parsed)`);
+      console.log(`SellIntent ${i} submitted, but event not parsed.`);
     }
   }
 
-  console.log("All SellIntents submitted via multisig. Now you can confirm them.");
+  console.log("All SellIntents submitted via multisig. Use confirm script to proceed.");
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error("Script failed:", err);
+  process.exit(1);
+});
