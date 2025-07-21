@@ -132,6 +132,25 @@ func main() {
 		} else {
 			fmt.Println("Unknown choice, use yes or no")
 		}
+	case "generate-message":
+		if len(os.Args) < 4 {
+			fmt.Println("Usage: go run main.go generate-message <secret> <btcAmount>")
+			return
+		}
+		secret := os.Args[2]
+		amountStr := os.Args[3]
+		err := scripts.GeneratePaymentMessage(secret, amountStr, "data/payment_message.json")
+		if err != nil {
+			fmt.Println("Generate message error:", err)
+		}
+
+	case "verify-message":
+		err := scripts.VerifyPaymentMessage("data/payment_message.json")
+		if err != nil {
+			fmt.Println("Verify failed:", err)
+		} else {
+			fmt.Println("Payment message verified successfully.")
+		}
 
 	case "fund-offchain":
 		if len(os.Args) < 3 {

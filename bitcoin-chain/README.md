@@ -210,3 +210,8 @@ go run ./src/sign-redeem-transaction/*.go
 
 ```bash
 bitcoin-cli sendrawtransaction <signed_redeem_txid>
+
+tạo payment channel
+solver gửi cho user thông tin thông qua op_return của transaction (off-chain)
+user dùng thông tin đó để tạo ra htlc
+solver dùng preimage secret để unlock cái htlc
