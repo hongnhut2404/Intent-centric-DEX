@@ -134,22 +134,40 @@ func main() {
 		}
 	case "generate-message":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run main.go generate-message <secret> <btcAmount>")
+			fmt.Println("Usage: go run main.go gen-message <secret> <btc_amount>")
 			return
 		}
 		secret := os.Args[2]
-		amountStr := os.Args[3]
-		err := scripts.GeneratePaymentMessage(secret, amountStr, "data/payment_message.json")
+		amount := os.Args[3]
+		err := scripts.GeneratePaymentMessage(secret, amount, "data/payment_message.json")
 		if err != nil {
-			fmt.Println("Generate message error:", err)
+			fmt.Println("Generate error:", err)
 		}
 
-	case "verify-message":
-		err := scripts.VerifyPaymentMessage("data/payment_message.json")
+	case "verify-opreturn":
+		if len(os.Args) != 4 {
+			fmt.Println("Usage: go run main.go verify-opreturn <payment_message.json> <payment_opreturn.txt>")
+			return
+		}
+
+		jsonPath := os.Args[2]
+		txPath := os.Args[3]
+
+		// Extract OP_RETURN message (format: "amount|secret_hash")
+		messageStr, err := scripts.ExtractOpReturnMessage(txPath)
 		if err != nil {
-			fmt.Println("Verify failed:", err)
+			fmt.Println("Failed to extract OP_RETURN:", err)
+			return
+		}
+
+		fmt.Println("Extracted OP_RETURN message:", messageStr)
+
+		// Verify that OP_RETURN matches JSON content + signature
+		err = scripts.VerifyPaymentMessageWithExtracted(messageStr, jsonPath)
+		if err != nil {
+			fmt.Println("Signature or content mismatch:", err)
 		} else {
-			fmt.Println("Payment message verified successfully.")
+			fmt.Println("Signature and OP_RETURN match verified.")
 		}
 
 	case "fund-offchain":

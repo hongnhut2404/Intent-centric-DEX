@@ -11,9 +11,7 @@ import (
 )
 
 func loadEnv() {
-	// Try to load from project root OR current folder
 	paths := []string{"../../.env", "../.env", "./.env"}
-
 	for _, path := range paths {
 		if err := godotenv.Load(path); err == nil {
 			return
@@ -56,48 +54,34 @@ func WriteOutput(filePath string, data interface{}) error {
 	return nil
 }
 
-func readSenderInfo() (map[string]interface{}, error) {
-	path := os.Getenv("ADDRESS_TEST")
+// ----------------------------- New Logic -----------------------------
+
+func readStateParticipants() (sender map[string]interface{}, receiver map[string]interface{}, err error) {
+	path := "payment-channel/data/state.json"
 	data, err := ReadInput(path)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to read state.json: %w", err)
 	}
 
-	senderInfo, ok := data["sender"].([]interface{})
-	if !ok || len(senderInfo) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'sender' field")
+	bob, ok1 := data["bob"].(map[string]interface{})
+	alice, ok2 := data["alice"].(map[string]interface{})
+	if !ok1 || !ok2 {
+		return nil, nil, fmt.Errorf("invalid format: missing 'bob' or 'alice'")
 	}
-
-	return senderInfo[0].(map[string]interface{}), nil
+	return bob, alice, nil
 }
 
-func readReceiverInfo() (map[string]interface{}, error) {
-	path := os.Getenv("ADDRESS_TEST")
+func readSecretHashFromMessage() (string, error) {
+	path := "payment-channel/data/payment_message.json"
 	data, err := ReadInput(path)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("failed to read payment_message.json: %w", err)
 	}
 
-	receiverInfo, ok := data["receiver"].([]interface{})
-	if !ok || len(receiverInfo) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'receiver' field")
-	}
-
-	return receiverInfo[0].(map[string]interface{}), nil
-}
-
-func readSecretHash() (string, error) {
-	path := os.Getenv("EXCHANGE_DATA")
-	data, err := ReadInput(path)
-	if err != nil {
-		return "", err
-	}
-
-	secretHash, ok := data["hashSha256"].(string)
+	secretHash, ok := data["secret_hash"].(string)
 	if !ok || secretHash == "" {
-		return "", fmt.Errorf("missing or invalid 'hashSha256' field")
+		return "", fmt.Errorf("missing or invalid 'secret_hash'")
 	}
-
 	return secretHash, nil
 }
 
@@ -107,16 +91,12 @@ func updateHTLCOutput(filePath, address, redeemScript string) error {
 		return fmt.Errorf("failed to read input: %w", err)
 	}
 
-	// Create new HTLC entry
 	newHTLC := map[string]interface{}{
 		"address":      address,
 		"redeemScript": redeemScript,
 	}
-
-	// Replace "HTLC" field
 	data["HTLC"] = []interface{}{newHTLC}
 
-	// Write back to file
 	err = WriteOutput(filePath, data)
 	if err != nil {
 		return fmt.Errorf("failed to write updated HTLC: %w", err)
@@ -124,35 +104,31 @@ func updateHTLCOutput(filePath, address, redeemScript string) error {
 	return nil
 }
 
+// ----------------------------- Main -----------------------------
+
 func main() {
 	loadEnv()
 
-	// Read sender info
-	sender, err := readSenderInfo()
+	// Load sender (Bob) and receiver (Alice)
+	sender, receiver, err := readStateParticipants()
 	if err != nil {
-		log.Fatalf("Failed to read sender info: %v", err)
+		log.Fatalf("Failed to read participants: %v", err)
 	}
-	senderPubKeyHex, _ := sender["pubkey"].(string)
+	senderPubKeyHex := sender["pubkey"].(string)
+	receiverPubKeyHex := receiver["pubkey"].(string)
 
-	// Read receiver info
-	receiver, err := readReceiverInfo()
-	if err != nil {
-		log.Fatalf("Failed to read receiver info: %v", err)
-	}
-	receiverPubKeyHex, _ := receiver["pubkey"].(string)
-
-	// Read secret hash
-	hashSecretHex, err := readSecretHash()
+	// Load secret hash from payment message
+	secretHash, err := readSecretHashFromMessage()
 	if err != nil {
 		log.Fatalf("Failed to read secret hash: %v", err)
 	}
-	fmt.Printf("SHA256 Hash: %s\n", hashSecretHex)
+	fmt.Printf("SHA256 Hash: %s\n", secretHash)
 
-	// Example locktime (block height or timestamp)
-	locktime := int64(300)
+	// Set locktime for HTLC
+	locktime := int64(300) // block height or timestamp
 
-	// Create HTLC contract
-	p2shAddress, redeemScriptHex, err := CreateHTLCContract(senderPubKeyHex, receiverPubKeyHex, hashSecretHex, locktime)
+	// Create HTLC redeem script and address
+	p2shAddress, redeemScriptHex, err := CreateHTLCContract(senderPubKeyHex, receiverPubKeyHex, secretHash, locktime)
 	if err != nil {
 		log.Fatalf("Failed to create HTLC: %v", err)
 	}
@@ -161,10 +137,12 @@ func main() {
 	fmt.Printf("P2SH Address:      %s\n", p2shAddress)
 	fmt.Printf("Redeem Script Hex: %s\n", redeemScriptHex)
 
-	// Write back to JSON
-	jsonPath := os.Getenv("ADDRESS_TEST")
-	err = updateHTLCOutput(jsonPath, p2shAddress, redeemScriptHex)
-	if err != nil {
+	// Save into output JSON file (e.g., ADDRESS_TEST path)
+	outputPath := os.Getenv("ADDRESS_TEST")
+	if outputPath == "" {
+		log.Fatal("Missing ADDRESS_TEST in .env")
+	}
+	if err := updateHTLCOutput(outputPath, p2shAddress, redeemScriptHex); err != nil {
 		log.Fatalf("Failed to update JSON: %v", err)
 	}
 }
