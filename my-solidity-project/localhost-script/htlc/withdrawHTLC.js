@@ -1,19 +1,23 @@
+// scripts/htlc/withdrawHTLC.js
+
 const hre = require("hardhat");
 const readline = require("readline-sync");
 const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  const buyIntentId = 0;
+  const buyIntentId = parseInt(process.env.BUY_ID || "0");
 
   const secret = readline.question("Enter the shared secret preimage: ");
   const secretHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
 
   const allSigners = await hre.ethers.getSigners();
 
-  // Load contract addresses
-  const intentJsonPath = path.resolve(__dirname, "../../data/intent-matching-address.json");
-  const { address: intentMatchingAddress } = JSON.parse(fs.readFileSync(intentJsonPath));
+  // Load deployed addresses
+  const { address: intentMatchingAddress } = JSON.parse(
+    fs.readFileSync("data/intent-matching-address.json", "utf8")
+  );
+
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
   const HTLC = await hre.ethers.getContractFactory("HTLC");
   const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
@@ -24,16 +28,14 @@ async function main() {
   const multisigAddress = await intentMatching.multisigWallet();
   const multisig = await MultisigWallet.attach(multisigAddress);
 
-  const ownerAddresses = await multisig.getOwners();
-  const localOwners = ownerAddresses
-    .map((addr) => allSigners.find((s) => s.address === addr))
+  const owners = await multisig.getOwners();
+  const localSigners = owners
+    .map((addr) => allSigners.find((s) => s.address.toLowerCase() === addr.toLowerCase()))
     .filter(Boolean);
 
-  if (localOwners.length < 2) {
-    throw new Error("Not enough local multisig owners to execute withdrawals.");
+  if (localSigners.length < owners.length) {
+    console.warn("Warning: Some multisig owners are not available locally.");
   }
-
-  const [submitter, confirmer] = localOwners;
 
   const filter = intentMatching.filters.HTLCAssociated(buyIntentId);
   const events = await intentMatching.queryFilter(filter);
@@ -48,56 +50,49 @@ async function main() {
   for (const event of events) {
     const { lockId, recipient } = event.args;
 
-    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
-    console.log(`\nLockID ${lockId}`);
-    console.log(`Recipient: ${recipient}`);
-    console.log(`Balance before: ${hre.ethers.formatEther(balanceBefore)} ETH`);
+    console.log(`\nWithdrawing HTLC: lockId=${lockId}, recipient=${recipient}`);
 
-    const calldata = htlc.interface.encodeFunctionData("withdraw", [lockId, secret]);
+    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
+    const calldata = htlc.interface.encodeFunctionData("withdraw", [lockId, hre.ethers.toUtf8Bytes(secret)]);
+
 
     try {
-      const submitTx = await multisig.connect(submitter).submitTransaction(htlcAddress, 0, calldata);
-      const receipt = await submitTx.wait();
+      const submitTx = await multisig.connect(localSigners[0]).submitTransaction(htlcAddress, 0, calldata);
+      await submitTx.wait();
+      const txID = (await multisig.txCounter()) - 1n;
 
-      const txID = receipt.logs
-        .map((log) => {
-          try {
-            return multisig.interface.parseLog(log);
-          } catch {
-            return null;
+      for (const signer of localSigners) {
+        try {
+          const tx = await multisig.connect(signer).confirmTransaction(txID);
+          await tx.wait();
+          console.log(`Tx ${txID} confirmed by ${signer.address}`);
+        } catch (err) {
+          if (!err.message.includes("Already confirmed")) {
+            console.warn(`Confirm by ${signer.address} failed: ${err.message}`);
           }
-        })
-        .find((log) => log?.name === "TransactionSubmitted")?.args.txID;
-
-      if (txID === undefined) {
-        console.error("Failed to extract txID");
-        continue;
+        }
       }
 
-      await multisig.connect(confirmer).confirmTransaction(txID);
-      const execTx = await multisig.connect(submitter).executeTransaction(txID);
+      const execTx = await multisig.connect(localSigners[0]).executeTransaction(txID);
       await execTx.wait();
 
       const balanceAfter = await hre.ethers.provider.getBalance(recipient);
       const delta = balanceAfter - balanceBefore;
 
-      console.log("Withdrawal successful.");
-      console.log(`Balance after: ${hre.ethers.formatEther(balanceAfter)} ETH`);
-      console.log(`Received: +${hre.ethers.formatEther(delta)} ETH`);
+      console.log("Withdraw successful.");
+      console.log(`Balance before: ${hre.ethers.formatEther(balanceBefore)} ETH`);
+      console.log(`Balance after : ${hre.ethers.formatEther(balanceAfter)} ETH`);
+      console.log(`Received      : +${hre.ethers.formatEther(delta)} ETH`);
       successCount++;
     } catch (err) {
-      console.error("Withdrawal failed:", err.reason || err.message);
+      console.error("Withdraw failed:", err.reason || err.message);
     }
   }
 
-  if (successCount === 0) {
-    console.log("No HTLCs withdrawn.");
-  } else {
-    console.log(`\nSuccessfully withdrawn ${successCount} HTLC(s) for BuyIntent ${buyIntentId}.`);
-  }
+  console.log(`\nSummary: Successfully withdrew ${successCount} HTLC(s) for BuyIntent ${buyIntentId}`);
 }
 
 main().catch((err) => {
-  console.error("Error:", err);
+  console.error("Fatal Error:", err);
   process.exitCode = 1;
 });

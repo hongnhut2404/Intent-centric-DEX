@@ -303,7 +303,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         bytes32 lockId,
         address recipient,
         bytes32 secretHash
-    ) external onlyOwner {
+    ) external onlyMultisig {
         emit HTLCAssociated(buyIntentId, lockId, recipient, secretHash);
     }
 
