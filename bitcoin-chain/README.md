@@ -79,6 +79,7 @@ Alice creates the HTLC on-chain.
 npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
 npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost
 BUY_ID=0 npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
+npx hardhat run localhost-script/htlc/refundHTLC.js --network localhost
 # Input: htlcAddress, recipient address, timelock
 # Output: secret (preimage), hash(secret) (sha256)
 ```

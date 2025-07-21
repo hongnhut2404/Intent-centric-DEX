@@ -12,7 +12,7 @@ async function main() {
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
   const contract = IntentMatching.attach(address);
 
-  const locktime = Math.floor(Date.now() / 1000) + 3600;
+  const locktime = Math.floor(Date.now() / 1000) + 90;
   const offchainId = ethers.encodeBytes32String("buy-eth");
 
   const buyIntents = [
