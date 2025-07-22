@@ -131,7 +131,7 @@ go run main.go
 
 ## Step 10: Scan HTLC Address to Save as UTXO
 ```bash
-bitcoin-cli scantxoutset start '["addr(<htlc_address>)"]' > ./data/utxo-htlc.json
+bitcoin-cli scantxoutset start '["addr(<address>)"]' > ../../data-script/utxo-htlc.json
 ```
 
 ## Step 11: Create Redeem Transaction (Alice Redeems BTC)

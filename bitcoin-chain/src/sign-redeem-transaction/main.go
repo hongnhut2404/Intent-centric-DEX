@@ -62,20 +62,17 @@ func readRedeemTransaction() (string, error) {
 }
 
 func readReceiverInfo() (map[string]interface{}, error) {
-	path := os.Getenv("ADDRESS_TEST")
-	if path == "" {
-		return nil, fmt.Errorf("ADDRESS_TEST not set in .env")
-	}
+	path := "../payment-channel/data/state.json"
 	data, err := ReadInput(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read state.json: %v", err)
 	}
 
-	receiverList, ok := data["receiver"].([]interface{})
-	if !ok || len(receiverList) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'receiver' field")
+	alice, ok := data["alice"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid 'alice' field in state.json")
 	}
-	return receiverList[0].(map[string]interface{}), nil
+	return alice, nil
 }
 
 func readHTLCInfo() (map[string]interface{}, error) {
@@ -119,6 +116,12 @@ func main() {
 	loadEnv()
 	netParams := &chaincfg.RegressionNetParams
 
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <secret>")
+		return
+	}
+	secret := os.Args[1]
+
 	txHex, err := readRedeemTransaction()
 	if err != nil {
 		fmt.Printf("Error reading redeem transaction: %v\n", err)
@@ -137,19 +140,12 @@ func main() {
 		return
 	}
 
-	secret, err := readSecretPreimage()
-	if err != nil {
-		fmt.Printf("Error reading secret: %v\n", err)
-		return
-	}
-
 	tx, err := decodeTx(txHex)
 	if err != nil {
 		fmt.Printf("Error decoding transaction: %v\n", err)
 		return
 	}
 
-	// Input for signing transaction
 	signInput := InputSignRedeemTransaction{
 		tx:                 tx,
 		redeemScript:       htlcMap["redeemScript"].(string),
@@ -158,7 +154,6 @@ func main() {
 		receiverPubKey:     receiverMap["pubkey"].(string),
 	}
 
-	// Sign transaction
 	signedTxHex, err := signTransaction(signInput, netParams)
 	if err != nil {
 		fmt.Printf("Error signing transaction: %v\n", err)

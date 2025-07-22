@@ -80,23 +80,19 @@ func readUTXO() (map[string]interface{}, error) {
 	return unspents[0].(map[string]interface{}), nil
 }
 
-// === Read Receiver Info ===
+// === Read Receiver Info from state.json (Alice) ===
 func readPartyInfo() (map[string]interface{}, error) {
-	path := os.Getenv("ADDRESS_TEST")
-	if path == "" {
-		return nil, fmt.Errorf("ADDRESS_TEST not set in .env")
-	}
+	path := "../payment-channel/data/state.json"
 	data, err := ReadInput(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read state.json: %v", err)
 	}
 
-	receiverList, ok := data["receiver"].([]interface{})
-	if !ok || len(receiverList) == 0 {
-		return nil, fmt.Errorf("missing or invalid 'receiver' field")
+	alice, ok := data["alice"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing or invalid 'alice' field in state.json")
 	}
-
-	return receiverList[0].(map[string]interface{}), nil
+	return alice, nil
 }
 
 // === Main ===
