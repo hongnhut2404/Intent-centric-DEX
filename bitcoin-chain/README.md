@@ -108,35 +108,53 @@ tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 ## Step 10. Create Multisig Address
 ```bash
 cd src/payment-channel
-go run main.go multisig
+go run main.go generate-message <secret> <amount>
 ```
 
-## Step 11. Fund the Multisig (Off-chain)
+
+## Step 11: Verify OP_RETURN and Extract Info
 ```bash
-go run main.go fund-offchain 10
+go run main.go verify-opreturn data/payment_message.json data/payment_opreturn.txt
 ```
 
-## Step 12. Set Funding Tx for HTLC
+## Step 8: Create HTLC Based on OP_RETURN Info
 ```bash
-bitcoin-cli decoderawtransaction <signed_funding_tx>
-go run main.go set-htlc-tx <txid> <vout>
-```
-## Step 13. Broadcast Funding Tx
-```bash
-bitcoin-cli sendrawtransaction <signed_funding_tx>
+cd ../create-HTLC-contract
+go run *.go
 ```
 
-## Step 14. Commitment Transaction (Optional for off-chain balance)
+## Step 9: Fund the HTLC in One Step
 ```bash
-go run main.go commit <amount_alice> <amount_bob>
-go run main.go sign-alice
-go run main.go verify
-go run main.go sign-bob yes
+cd ../fund-HTLC
+go run main.go
 ```
-## Step 15. Settle (Simulate On-chain)
+
+## Step 10: Scan HTLC Address to Save as UTXO
 ```bash
-go run main.go settle
+bitcoin-cli scantxoutset start '["addr(<htlc_address>)"]' > ./data/utxo-htlc.json
+```
+
+## Step 11: Create Redeem Transaction (Alice Redeems BTC)
+```bash
+cd ../create-redeem-transaction
+go run main.go
+```
+
+## Step 12: Sign Redeem Transaction
+```bash
+cd ../sign-redeem-transaction
+go run main.go
+```
+
+## Step 13: Broadcast Redeem Transaction
+```bash
+bitcoin-cli sendrawtransaction <signed_redeem_tx>
+```
+
+## Step 14: Generate 1 Block to Confirm
+```bash
 bitcoin-cli generate 1
+```
 ```
 
 ## Step 16: Alice Reveals the Secret
