@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
-	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -59,14 +59,15 @@ func signTransaction(input InputSignRedeemTransaction, netParams *chaincfg.Param
 	// Decode redeem script
 	redeemScriptBytes, err := hex.DecodeString(input.redeemScript)
 	if err != nil {
-		return "", fmt.Errorf("error decoding redeem script: % glim", err)
+		return "", fmt.Errorf("error decoding redeem script: %v", err)
 	}
-	// Decode private key
-	wif, err := btcutil.DecodeWIF(input.receiverPrivKeyWif)
+
+	// Decode private key from hex (not WIF)
+	privKeyBytes, err := hex.DecodeString(input.receiverPrivKeyWif)
 	if err != nil {
-		return "", fmt.Errorf("error decoding WIF private key: %v", err)
+		return "", fmt.Errorf("error decoding hex private key: %v", err)
 	}
-	privKey := wif.PrivKey
+	privKey, _ := btcec.PrivKeyFromBytes(privKeyBytes)
 	pubKey := privKey.PubKey()
 
 	// Verify public key
