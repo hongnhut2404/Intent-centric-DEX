@@ -126,12 +126,13 @@ go run *.go
 ## Step 13: Fund the HTLC in One Step
 ```bash
 cd ../fund
-go run main.go
+go run *.go
 ```
 
 ## Step 14: Scan HTLC Address to Save as UTXO
 ```bash
-bitcoin-cli scantxoutset start '["addr(<htlc-address>)"]' > ../../../data-script/utxo-htlc.json
+cd ../scan-htlc
+go run *.go
 
 ```
 
@@ -156,7 +157,6 @@ bitcoin-cli sendrawtransaction <signed_redeem_tx>
 ## Step 18: Generate 1 Block to Confirm
 ```bash
 bitcoin-cli generate 1
-```
 ```
 
 ## Step 19: Alice Reveals the Secret
