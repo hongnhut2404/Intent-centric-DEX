@@ -36,6 +36,7 @@ async function main() {
   const hashKeccak = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
   const hashSha256 = crypto.createHash("sha256").update(secret).digest("hex");
 
+  const htlcMetadata = [];
   let created = 0;
   let associated = 0;
 
@@ -65,7 +66,7 @@ async function main() {
     for (let j = 0; j < threshold; j++) {
       try {
         await multisig.connect(localOwners[j]).confirmTransaction(txID);
-      } catch {}
+      } catch { }
     }
 
     let execReceipt;
@@ -107,14 +108,24 @@ async function main() {
     for (let j = 0; j < threshold; j++) {
       try {
         await multisig.connect(localOwners[j]).confirmTransaction(associateTxID);
-      } catch {}
+      } catch { }
     }
 
     try {
       const exec2 = await multisig.connect(localOwners[0]).executeTransaction(associateTxID);
       await exec2.wait();
       associated++;
-    } catch {}
+    } catch { }
+
+    // Save HTLC metadata for BTC side
+    htlcMetadata.push({
+      lockId: lockId.toString(),
+      locktime: Number(trade.locktime),
+      secret,
+      hashKeccak,
+      hashSha256,
+      btcAmount: parseFloat(hre.ethers.utils.formatUnits(trade.btcAmount, 8)), 
+    });
   }
 
   console.log("\nSummary:");
@@ -124,6 +135,26 @@ async function main() {
     console.log("Shared Secret:", secret);
     console.log("Keccak256 (ETH):", hashKeccak);
     console.log("SHA256 (BTC):", hashSha256);
+  }
+
+  exchangePath = "../../../bitcoin-chain/data-script/exchange-data.json"
+  const outputJsonPath = path.resolve(__dirname, exchangePath);
+  const outputDir = path.dirname(outputJsonPath);
+
+  // Create directory if it doesn't exist
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  fs.writeFileSync(outputJsonPath, JSON.stringify({ success: true, htlcs: htlcMetadata }, null, 2));
+  console.log(`HTLC metadata saved to: ${outputJsonPath}`);
+
+
+  // === Write to exchange-data.json
+  if (htlcMetadata.length > 0) {
+    const outputJsonPath = path.resolve(__dirname, exchangePath);
+    fs.writeFileSync(outputJsonPath, JSON.stringify({ success: true, htlcs: htlcMetadata }, null, 2));
+    console.log(`HTLC metadata saved to: ${outputJsonPath}`);
   }
 }
 
