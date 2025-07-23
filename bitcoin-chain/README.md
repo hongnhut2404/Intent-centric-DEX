@@ -154,17 +154,13 @@ bitcoin-cli sendrawtransaction <signed_redeem_tx>
 
 ```
 
-## Step 18: Generate 1 Block to Confirm
-```bash
-bitcoin-cli generate 1
-```
 
-## Step 19: Alice Reveals the Secret
+## Step 18: Alice Reveals the Secret
 Once Alice redeems BTC, the `secret` becomes public on the blockchain.
 
 ---
 
-## Step 20: Bob Uses Secret to Claim ETH
+## Step 19: Bob Uses Secret to Claim ETH
 Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
 
 ```bash

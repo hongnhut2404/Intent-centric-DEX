@@ -24,39 +24,25 @@ func loadEnv() {
 	log.Fatal("Error loading .env from known locations")
 }
 
-// === Reusable JSON Reader/Writer ===
+// === JSON Reader/Writer ===
 func ReadInput(filePath string) (map[string]interface{}, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open file: %w", err)
-	}
-	defer file.Close()
-
-	bytes, err := ioutil.ReadAll(file)
+	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read file: %w", err)
 	}
-
-	var data map[string]interface{}
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
 		return nil, fmt.Errorf("invalid JSON format: %w", err)
 	}
-
-	return data, nil
+	return result, nil
 }
 
 func WriteOutput(filePath string, data interface{}) error {
-	bytes, err := json.MarshalIndent(data, "", "  ")
+	out, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal output: %w", err)
 	}
-
-	err = ioutil.WriteFile(filePath, bytes, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write output to file: %w", err)
-	}
-	return nil
+	return ioutil.WriteFile(filePath, out, 0644)
 }
 
 // === Read UTXO ===
@@ -69,39 +55,46 @@ func readUTXO() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	unspentsRaw, ok := data["unspents"]
-	if !ok || unspentsRaw == nil {
-		return nil, fmt.Errorf("missing or null 'unspents' field")
-	}
-	unspents, ok := unspentsRaw.([]interface{})
-	if !ok || len(unspents) == 0 {
-		return nil, fmt.Errorf("'unspents' is not a non-empty array")
-	}
-	return unspents[0].(map[string]interface{}), nil
+	unspentsRaw := data["unspents"].([]interface{})
+	return unspentsRaw[0].(map[string]interface{}), nil
 }
 
 // === Read Receiver Info from state.json (Alice) ===
 func readPartyInfo() (map[string]interface{}, error) {
 	path := os.Getenv("STATE_PATH_HTLC")
 	if path == "" {
-		return nil, fmt.Errorf("STATE_PATH_HTLCnot set in .env")
+		return nil, fmt.Errorf("STATE_PATH_HTLC not set in .env")
 	}
 	data, err := ReadInput(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read state.json: %v", err)
+		return nil, err
 	}
+	return data["alice"].(map[string]interface{}), nil
+}
 
-	alice, ok := data["alice"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("missing or invalid 'alice' field in state.json")
+// === Read BTC amount from payment message ===
+func readBTCAmountFromMessage() (float64, error) {
+	path := os.Getenv("PAYMENT_MESSAGE_HTLC")
+	if path == "" {
+		return 0, fmt.Errorf("PAYMENT_MESSAGE_HTLC not set in .env")
 	}
-	return alice, nil
+	data, err := ReadInput(path)
+	if err != nil {
+		return 0, err
+	}
+	amount, ok := data["btc_amount"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid or missing btc_amount field")
+	}
+	return amount, nil
 }
 
 // === Main ===
 func main() {
 	loadEnv()
 	netParams := &chaincfg.RegressionNetParams
+	const feeSats = 500
+	const satsPerBTC = 1e8
 
 	firstUnspent, err := readUTXO()
 	if err != nil {
@@ -113,40 +106,40 @@ func main() {
 		log.Fatalf("Failed to read party info: %v", err)
 	}
 
+	btcAmount, err := readBTCAmountFromMessage()
+	if err != nil {
+		log.Fatalf("Failed to read BTC amount: %v", err)
+	}
+
+	outputAmount := (btcAmount*satsPerBTC - feeSats) / satsPerBTC
+
 	rawInput := InputRawRedeemTransaction{
 		prevTxHash:      firstUnspent["txid"].(string),
 		prevOutputIndex: uint32(firstUnspent["vout"].(float64)),
 		outputAddr:      receiverMap["address"].(string),
-		outputAmount:    9.99990000,
+		outputAmount:    outputAmount,
 	}
 
 	tx, err := createRawTransaction(rawInput, netParams)
 	if err != nil {
-		fmt.Printf("Error creating raw transaction: %v\n", err)
-		return
+		log.Fatalf("Error creating raw transaction: %v", err)
 	}
 
 	var buf bytes.Buffer
-	err = tx.Serialize(&buf)
-	if err != nil {
-		fmt.Printf("Failed to serialize transaction: %v\n", err)
-		return
+	if err := tx.Serialize(&buf); err != nil {
+		log.Fatalf("Failed to serialize transaction: %v", err)
 	}
 	rawTxHex := hex.EncodeToString(buf.Bytes())
 	fmt.Println("Raw redeem transaction (hex):", rawTxHex)
 
-	// Save to JSON file
 	output := map[string]interface{}{
 		"raw_redeem_transaction": rawTxHex,
 	}
-
 	outputPath := os.Getenv("REDEEM_TX_OUTPUT")
 	if outputPath == "" {
 		log.Fatal("REDEEM_TX_OUTPUT not set in .env")
 	}
-
-	err = WriteOutput(outputPath, output)
-	if err != nil {
+	if err := WriteOutput(outputPath, output); err != nil {
 		log.Fatalf("Failed to write raw redeem transaction: %v", err)
 	}
 
