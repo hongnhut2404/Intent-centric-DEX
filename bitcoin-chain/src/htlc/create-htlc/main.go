@@ -19,7 +19,7 @@ type HTLCInput struct {
 }
 
 func loadEnv() {
-	paths := []string{"../../.env", "../.env", "./.env"}
+	paths := []string{"../../.env", "../.env", "./.env", "../../../.env"}
 	for _, path := range paths {
 		if err := godotenv.Load(path); err == nil {
 			return
@@ -67,7 +67,16 @@ func updateHTLCOutput(filePath, address, redeemScript string) error {
 func main() {
 	loadEnv()
 
-	input, err := readHTLCInput("../payment-channel/data/payment_message.json")
+	messagePath := os.Getenv("PAYMENT_MESSAGE_HTLC")
+	if messagePath == "" {
+		log.Fatal("Missing PAYMENT_MESSAGE in .env")
+	}
+
+	input, err := readHTLCInput(messagePath)
+	if err != nil {
+		log.Fatalf("Failed to read HTLC input: %v", err)
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to read HTLC input: %v", err)
 	}

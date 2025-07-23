@@ -20,7 +20,7 @@ import (
 )
 
 func loadEnv() {
-	paths := []string{"../../.env", "../.env", "./.env"}
+	paths := []string{"../../.env", "../.env", "./.env", "../../../.env"}
 	for _, path := range paths {
 		if err := godotenv.Load(path); err == nil {
 			return
@@ -51,8 +51,13 @@ func ReadInput(filePath string) (map[string]interface{}, error) {
 }
 
 func FundHTLC() error {
+	loadEnv()
+
 	// Load HTLC P2SH address
-	htlcFile := "../../data-script/address-test.json"
+	htlcFile := os.Getenv("ADDRESS_TEST")
+	if htlcFile == "" {
+		return fmt.Errorf("ADDRESS_TEST is not set in .env")
+	}
 	htlcRaw, err := ioutil.ReadFile(htlcFile)
 	if err != nil {
 		return fmt.Errorf("failed to read address-test.json: %v", err)
@@ -64,8 +69,12 @@ func FundHTLC() error {
 	htlc := htlcData["HTLC"].([]interface{})[0].(map[string]interface{})
 	htlcAddr := htlc["address"].(string)
 
-	// Load UTXO data (from scanned output)
-	utxoRaw, err := ioutil.ReadFile("../../data-script/utxo.json")
+	// Load UTXO data
+	utxoFile := os.Getenv("UTXO_JSON")
+	if utxoFile == "" {
+		return fmt.Errorf("UTXO_JSON is not set in .env")
+	}
+	utxoRaw, err := ioutil.ReadFile(utxoFile)
 	if err != nil {
 		return fmt.Errorf("failed to read utxo.json: %v", err)
 	}
@@ -82,7 +91,11 @@ func FundHTLC() error {
 	scriptPubKeyHex := first["scriptPubKey"].(string)
 
 	// Load BTC amount from payment message
-	msg, err := ReadInput("../payment-channel/data/payment_message.json")
+	msgPath := os.Getenv("PAYMENT_MESSAGE_HTLC")
+	if msgPath == "" {
+		return fmt.Errorf("PAYMENT_MESSAGE_HTLC is not set in .env")
+	}
+	msg, err := ReadInput(msgPath)
 	if err != nil {
 		return fmt.Errorf("failed to read payment_message.json: %v", err)
 	}
@@ -94,7 +107,11 @@ func FundHTLC() error {
 	}
 
 	// Load Bob's private key
-	state, err := ReadInput("../payment-channel/data/state.json")
+	statePath := os.Getenv("STATE_PATH_HTLC")
+	if statePath == "" {
+		return fmt.Errorf("STATE_PATH_HTLC is not set in .env")
+	}
+	state, err := ReadInput(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to read state.json: %v", err)
 	}
@@ -135,8 +152,7 @@ func FundHTLC() error {
 	fmt.Println("Raw Signed Transaction:")
 	fmt.Println(hex.EncodeToString(buf.Bytes()))
 
-	// Optionally broadcast via RPC
-	loadEnv()
+	// Send via RPC
 	client, err := rpcclient.New(&rpcclient.ConnConfig{
 		Host:         os.Getenv("RPC_HOST"),
 		User:         os.Getenv("RPC_USER"),

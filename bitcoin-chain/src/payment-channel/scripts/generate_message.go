@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -22,7 +23,6 @@ type PaymentMessage struct {
 	PubKey     string  `json:"pubkey"`
 }
 
-// Load Alice's private key and pubkey from state.json
 func loadAliceKeyPair(statePath string) (*btcec.PrivateKey, string, error) {
 	file, err := os.ReadFile(statePath)
 	if err != nil {
@@ -39,13 +39,10 @@ func loadAliceKeyPair(statePath string) (*btcec.PrivateKey, string, error) {
 		return nil, "", fmt.Errorf("missing 'alice' key in state.json")
 	}
 
-	privHex, ok := alice["privkey"]
-	if !ok || privHex == "" {
-		return nil, "", fmt.Errorf("missing 'privkey' for alice in state.json")
-	}
-	pubHex, ok := alice["pubkey"]
-	if !ok || pubHex == "" {
-		return nil, "", fmt.Errorf("missing 'pubkey' for alice in state.json")
+	privHex := alice["privkey"]
+	pubHex := alice["pubkey"]
+	if privHex == "" || pubHex == "" {
+		return nil, "", fmt.Errorf("missing privkey or pubkey for alice in state.json")
 	}
 
 	privBytes, err := hex.DecodeString(privHex)
@@ -57,28 +54,25 @@ func loadAliceKeyPair(statePath string) (*btcec.PrivateKey, string, error) {
 	return privKey, pubHex, nil
 }
 
-func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath string) error {
+func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath string, opreturnPath string, statePath string) error {
 	btcAmount, err := strconv.ParseFloat(btcAmountStr, 64)
 	if err != nil {
 		return fmt.Errorf("invalid BTC amount: %v", err)
 	}
 
-	// Load Alice's private key and pubkey
-	privKey, pubKeyHex, err := loadAliceKeyPair("./data/state.json")
+	privKey, pubKeyHex, err := loadAliceKeyPair(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to load Alice's key: %v", err)
 	}
 
-	// Hash the secret
 	secretHashBytes := sha256.Sum256([]byte(secret))
 	secretHash := hex.EncodeToString(secretHashBytes[:])
 
-	// Sign the message: secretHash|amount
+	// Sign message hash
 	raw := []byte(secretHash + "|" + btcAmountStr)
 	digest := sha256.Sum256(raw)
 	sig := ecdsa.Sign(privKey, digest[:])
 
-	// Save signed message to JSON
 	message := PaymentMessage{
 		BTCAmount:  btcAmount,
 		SecretHash: secretHash,
@@ -86,22 +80,28 @@ func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath strin
 		PubKey:     pubKeyHex,
 	}
 
+	// Ensure output dir
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return fmt.Errorf("failed to create output dir: %v", err)
+	}
+
+	// Save message JSON
 	file, err := os.Create(outputPath)
 	if err != nil {
-		return fmt.Errorf("failed to create file: %v", err)
+		return fmt.Errorf("failed to create message file: %v", err)
 	}
 	defer file.Close()
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(&message); err != nil {
-		return fmt.Errorf("failed to encode JSON: %v", err)
+		return fmt.Errorf("failed to encode message JSON: %v", err)
 	}
 
 	fmt.Println("Payment message saved to", outputPath)
 	fmt.Println("Secret Hash (for Bitcoin HTLC):", secretHash)
 
-	// --- Create OP_RETURN output with amount|secretHash ---
+	// Build OP_RETURN output
 	shortMsg := fmt.Sprintf("%.8f|%s", btcAmount, secretHash)
 	shortMsgBytes := []byte(shortMsg)
 
@@ -109,7 +109,7 @@ func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath strin
 		return fmt.Errorf("OP_RETURN message too long: %d bytes", len(shortMsgBytes))
 	}
 
-	opReturnScript, err := txscript.NewScriptBuilder().
+	script, err := txscript.NewScriptBuilder().
 		AddOp(txscript.OP_RETURN).
 		AddData(shortMsgBytes).
 		Script()
@@ -118,20 +118,20 @@ func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath strin
 	}
 
 	tx := &wire.MsgTx{Version: 1}
-	txOut := wire.NewTxOut(0, opReturnScript)
-	tx.AddTxOut(txOut)
+	tx.AddTxOut(wire.NewTxOut(0, script))
 
-	fmt.Println("HasWitness:", tx.HasWitness())
-
+	// Write OP_RETURN tx
 	var buf bytes.Buffer
 	if err := tx.SerializeNoWitness(&buf); err != nil {
-		return fmt.Errorf("failed to serialize tx (no witness): %v", err)
+		return fmt.Errorf("failed to serialize tx: %v", err)
 	}
-
-	if err := os.WriteFile("data/payment_opreturn.txt", []byte(hex.EncodeToString(buf.Bytes())), 0644); err != nil {
+	if err := os.MkdirAll(filepath.Dir(opreturnPath), 0755); err != nil {
+		return fmt.Errorf("failed to create OP_RETURN path dir: %v", err)
+	}
+	if err := os.WriteFile(opreturnPath, []byte(hex.EncodeToString(buf.Bytes())), 0644); err != nil {
 		return fmt.Errorf("failed to write OP_RETURN tx: %v", err)
 	}
 
-	fmt.Println("OP_RETURN tx (hex) saved to data/payment_opreturn.txt")
+	fmt.Println("OP_RETURN tx (hex) saved to", opreturnPath)
 	return nil
 }

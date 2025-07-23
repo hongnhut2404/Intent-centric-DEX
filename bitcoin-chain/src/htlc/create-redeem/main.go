@@ -15,7 +15,7 @@ import (
 
 // === Load .env ===
 func loadEnv() {
-	paths := []string{"../../.env", "../.env", "./.env"}
+	paths := []string{"../../../.env", "../../.env", "../.env", "./.env"}
 	for _, path := range paths {
 		if err := godotenv.Load(path); err == nil {
 			return
@@ -82,7 +82,10 @@ func readUTXO() (map[string]interface{}, error) {
 
 // === Read Receiver Info from state.json (Alice) ===
 func readPartyInfo() (map[string]interface{}, error) {
-	path := "../payment-channel/data/state.json"
+	path := os.Getenv("STATE_PATH_HTLC")
+	if path == "" {
+		return nil, fmt.Errorf("STATE_PATH_HTLCnot set in .env")
+	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read state.json: %v", err)

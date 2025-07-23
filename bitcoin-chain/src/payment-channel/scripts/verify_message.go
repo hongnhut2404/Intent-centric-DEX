@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -17,7 +18,6 @@ import (
 )
 
 func AddSenderPubKeyToMessage(jsonPath, bobPubKeyHex string) error {
-	// Read original file
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {
 		return fmt.Errorf("failed to read payment message: %v", err)
@@ -28,10 +28,8 @@ func AddSenderPubKeyToMessage(jsonPath, bobPubKeyHex string) error {
 		return fmt.Errorf("invalid JSON: %v", err)
 	}
 
-	// Inject or overwrite sender_pubkey
 	msg["sender_pubkey"] = bobPubKeyHex
 
-	// Write updated JSON
 	updated, err := json.MarshalIndent(msg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated JSON: %v", err)
@@ -41,35 +39,33 @@ func AddSenderPubKeyToMessage(jsonPath, bobPubKeyHex string) error {
 		return fmt.Errorf("failed to write updated payment message: %v", err)
 	}
 
-	fmt.Println("Bob's sender_pubkey added to payment_message.json")
+	fmt.Println("Bob's sender_pubkey added to", filepath.Base(jsonPath))
 	return nil
 }
 
 func loadBobPubKey(statePath string) (string, error) {
 	file, err := os.ReadFile(statePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read state.json: %v", err)
+		return "", fmt.Errorf("failed to read state file: %v", err)
 	}
 
 	var state map[string]map[string]string
 	if err := json.Unmarshal(file, &state); err != nil {
-		return "", fmt.Errorf("invalid JSON format in state.json: %v", err)
+		return "", fmt.Errorf("invalid JSON in state file: %v", err)
 	}
 
 	bob, ok := state["bob"]
 	if !ok {
-		return "", fmt.Errorf("missing 'bob' entry in state.json")
+		return "", fmt.Errorf("missing 'bob' entry")
 	}
-
-	pubHex, ok := bob["pubkey"]
-	if !ok || pubHex == "" {
-		return "", fmt.Errorf("missing or invalid 'pubkey' for bob")
+	pubHex := bob["pubkey"]
+	if pubHex == "" {
+		return "", fmt.Errorf("missing 'pubkey' for bob")
 	}
 
 	return pubHex, nil
 }
 
-// ExtractOpReturnMessage reads a hex-encoded transaction and extracts the OP_RETURN message string.
 func ExtractOpReturnMessage(txHexPath string) (string, error) {
 	raw, err := os.ReadFile(txHexPath)
 	if err != nil {
@@ -78,7 +74,7 @@ func ExtractOpReturnMessage(txHexPath string) (string, error) {
 
 	txBytes, err := hex.DecodeString(strings.TrimSpace(string(raw)))
 	if err != nil {
-		return "", fmt.Errorf("failed to decode hex: %v", err)
+		return "", fmt.Errorf("failed to decode tx hex: %v", err)
 	}
 
 	var tx wire.MsgTx
@@ -87,8 +83,7 @@ func ExtractOpReturnMessage(txHexPath string) (string, error) {
 	}
 
 	for _, out := range tx.TxOut {
-		scriptClass := txscript.GetScriptClass(out.PkScript)
-		if scriptClass == txscript.NullDataTy {
+		if txscript.GetScriptClass(out.PkScript) == txscript.NullDataTy {
 			data, err := txscript.PushedData(out.PkScript)
 			if err != nil {
 				return "", fmt.Errorf("failed to extract OP_RETURN data: %v", err)
@@ -102,14 +97,12 @@ func ExtractOpReturnMessage(txHexPath string) (string, error) {
 	return "", fmt.Errorf("no OP_RETURN output found")
 }
 
-// VerifyPaymentMessageWithExtracted compares OP_RETURN message with JSON signature
-func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string) error {
+func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string, statePath string) error {
 	parts := strings.Split(opReturn, "|")
 	if len(parts) != 2 {
 		return fmt.Errorf("invalid OP_RETURN format: expected 'amount|secret_hash'")
 	}
 
-	// Normalize amount
 	amountFloat, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return fmt.Errorf("invalid amount in OP_RETURN: %v", err)
@@ -129,7 +122,6 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string) error {
 		return fmt.Errorf("failed to parse payment message: %v", err)
 	}
 
-	// Sanity checks
 	if amountFloat != msg.BTCAmount {
 		return fmt.Errorf("amount mismatch: expected %.8f, got %.8f", amountFloat, msg.BTCAmount)
 	}
@@ -137,15 +129,13 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string) error {
 		return fmt.Errorf("secret hash mismatch")
 	}
 
-	// Recreate signed message and hash
-	signedMessage := fmt.Sprintf("%s|%s", msg.SecretHash, amountStr)
-	digest := sha256.Sum256([]byte(signedMessage))
-	fmt.Println("Verifying message:", signedMessage)
+	// Verify signature
+	digest := sha256.Sum256([]byte(msg.SecretHash + "|" + amountStr))
+	fmt.Println("Verifying message:", msg.SecretHash+"|"+amountStr)
 
-	// Decode pubkey and signature
 	pubBytes, err := hex.DecodeString(msg.PubKey)
 	if err != nil {
-		return fmt.Errorf("invalid pubkey hex: %v", err)
+		return fmt.Errorf("invalid pubkey: %v", err)
 	}
 	pubKey, err := btcec.ParsePubKey(pubBytes)
 	if err != nil {
@@ -158,7 +148,7 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string) error {
 	}
 	sig, err := ecdsa.ParseDERSignature(sigBytes)
 	if err != nil {
-		return fmt.Errorf("signature parse error: %v", err)
+		return fmt.Errorf("failed to parse signature: %v", err)
 	}
 
 	if !sig.Verify(digest[:], pubKey) {
@@ -166,13 +156,11 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string) error {
 	}
 	fmt.Println("Signature verification successful ✅")
 
-	// === Load Bob's pubkey from state.json ===
-	bobPubKey, err := loadBobPubKey("./data/state.json")
+	bobPubKey, err := loadBobPubKey(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to load Bob's pubkey: %v", err)
 	}
 
-	// === Add Bob's pubkey to payment_message.json ===
 	if err := AddSenderPubKeyToMessage(jsonPath, bobPubKey); err != nil {
 		return fmt.Errorf("failed to inject sender_pubkey: %v", err)
 	}

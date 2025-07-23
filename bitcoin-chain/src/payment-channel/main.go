@@ -2,46 +2,55 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"example.com/m/keys"
 	"example.com/m/scripts"
 	"example.com/m/txbuilder"
+	"github.com/joho/godotenv"
 )
 
+func loadEnv() {
+	paths := []string{"../../.env", "../.env", "./.env"} // flexible search
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			return
+		}
+	}
+	log.Fatal("Error loading .env from known locations")
+}
+
 func main() {
+	loadEnv()
+
+	statePath := os.Getenv("STATE_PATH")
+	paymentMessagePath := os.Getenv("PAYMENT_MESSAGE")
+	opreturnTxPath := os.Getenv("OPRETURN_TX")
+
+	if statePath == "" || paymentMessagePath == "" || opreturnTxPath == "" {
+		log.Fatal("Missing environment variables: STATE_PATH, PAYMENT_MESSAGE, or OPRETURN_TX")
+	}
+
 	if len(os.Args) < 2 {
 		fmt.Println("Usage:")
 		fmt.Println("  go run main.go [init|fund|multisig|htlc|commit|sign|settle|refund]")
-		fmt.Println()
-		fmt.Println("Commands:")
-		fmt.Println("  init <alice|bob>               Generate keypair and store in state.json")
-		fmt.Println("  fund                           Fund the HTLC address (read from fund.json)")
-		fmt.Println("  multisig                       Generate 2-of-2 multisig and P2SH address")
-		fmt.Println("  htlc <sha256(secret)> <locktime>   Generate HTLC P2SH script and address")
-		fmt.Println("  commit                         Build unsigned commitment tx for Alice")
-		fmt.Println("  sign <secret>                  Sign the commitment tx with secret (preimage)")
-		fmt.Println("  settle                         Alias for broadcasting signed commitment tx")
-		fmt.Println("  refund                         Build refund tx for Bob (after timeout)")
 		return
 	}
 
-	cmd := os.Args[1]
-
-	switch cmd {
+	switch os.Args[1] {
 	case "init":
 		if len(os.Args) < 3 {
 			fmt.Println("Usage: go run main.go init <alice|bob>")
 			return
 		}
-		role := os.Args[2]
-		keys.GenerateAndStoreKeys("data/state.json", role)
+		keys.GenerateAndStoreKeys(statePath, os.Args[2])
 
 	case "fund":
-		txbuilder.FundChannel("data/state.json")
+		txbuilder.FundChannel(statePath)
 
 	case "multisig":
-		_, _, err := scripts.GenerateMultisig("data/state.json")
+		_, _, err := scripts.GenerateMultisig(statePath)
 		if err != nil {
 			fmt.Println("Multisig error:", err)
 		}
@@ -51,9 +60,7 @@ func main() {
 			fmt.Println("Usage: go run main.go htlc <sha256(secret)> <timelock>")
 			return
 		}
-		hashlock := os.Args[2]
-		timelock := os.Args[3] // pass as string, parse inside the function
-		_, _, err := scripts.GenerateHTLCScript("data/state.json", hashlock, parseInt64(timelock))
+		_, _, err := scripts.GenerateHTLCScript(statePath, os.Args[2], parseInt64(os.Args[3]))
 		if err != nil {
 			fmt.Println("HTLC error:", err)
 		}
@@ -63,83 +70,38 @@ func main() {
 			fmt.Println("Usage: go run main.go commit <aliceAmount> <bobAmount>")
 			return
 		}
-
-		var aliceAmount, bobAmount float64
-		fmt.Sscanf(os.Args[2], "%f", &aliceAmount)
-		fmt.Sscanf(os.Args[3], "%f", &bobAmount)
-		err := txbuilder.CreateCommitmentTx("data/state.json", aliceAmount, bobAmount)
-		if err != nil {
+		var a, b float64
+		fmt.Sscanf(os.Args[2], "%f", &a)
+		fmt.Sscanf(os.Args[3], "%f", &b)
+		if err := txbuilder.CreateCommitmentTx(statePath, a, b); err != nil {
 			fmt.Println("Commitment Tx error:", err)
 		}
 
 	case "sign":
-		err := txbuilder.SignCommitmentTx("data/state.json")
-		if err != nil {
+		if err := txbuilder.SignCommitmentTx(statePath); err != nil {
 			fmt.Println("Sign error:", err)
 		}
 
-	case "verify":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run main.go verify <commitmentHex>")
-			return
-		}
-		commitmentHex := os.Args[2]
-		err := txbuilder.VerifyCommitmentProposal(commitmentHex)
-		if err != nil {
-			fmt.Println("Verify error:", err)
-		}
-
 	case "settle":
-		// Shortcut: read commit-signed.txt and broadcast manually
-		signed, err := os.ReadFile("data/commit-signed.txt")
+		b, err := os.ReadFile("data/commit-signed.txt")
 		if err != nil {
 			fmt.Println("Missing signed tx file:", err)
 			return
 		}
 		fmt.Println("Use bitcoin-cli to send this tx:")
-		fmt.Println("bitcoin-cli sendrawtransaction", string(signed))
+		fmt.Println("bitcoin-cli sendrawtransaction", string(b))
 
 	case "refund":
-		err := txbuilder.RefundTransaction("data/state.json")
-		if err != nil {
+		if err := txbuilder.RefundTransaction(statePath); err != nil {
 			fmt.Println("Refund error:", err)
 		}
-	case "sign-alice":
-		err := txbuilder.SignCommitmentTxAlice("data/state.json")
-		if err != nil {
-			fmt.Println("Sign Alice error:", err)
-		}
-	case "sign-bob":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run main.go sign-bob <yes|no>")
-			return
-		}
-		choice := os.Args[2]
-		if choice == "yes" {
-			err := txbuilder.SignCommitmentTxBob("data/state.json")
-			if err != nil {
-				fmt.Println("Sign Bob error:", err)
-			}
-		} else if choice == "no" {
-			fmt.Println("Bob refused the proposal, broadcasting the latest valid commitment to settle the channel.")
-			signed, err := os.ReadFile("data/commit-signed.txt")
-			if err != nil {
-				fmt.Println("Missing previous signed tx:", err)
-				return
-			}
-			fmt.Println("Use bitcoin-cli to broadcast this last commitment:")
-			fmt.Println("bitcoin-cli sendrawtransaction", string(signed))
-		} else {
-			fmt.Println("Unknown choice, use yes or no")
-		}
+
 	case "generate-message":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run main.go gen-message <secret> <btc_amount>")
+			fmt.Println("Usage: go run main.go generate-message <secret> <btc_amount>")
 			return
 		}
-		secret := os.Args[2]
-		amount := os.Args[3]
-		err := scripts.GeneratePaymentMessage(secret, amount, "data/payment_message.json")
+		err := scripts.GeneratePaymentMessage(os.Args[2], os.Args[3], paymentMessagePath, opreturnTxPath, statePath)
 		if err != nil {
 			fmt.Println("Generate error:", err)
 		}
@@ -149,61 +111,22 @@ func main() {
 			fmt.Println("Usage: go run main.go verify-opreturn <payment_message.json> <payment_opreturn.txt>")
 			return
 		}
-
-		jsonPath := os.Args[2]
-		txPath := os.Args[3]
-
-		// Extract OP_RETURN message (format: "amount|secret_hash")
-		messageStr, err := scripts.ExtractOpReturnMessage(txPath)
+		msg, err := scripts.ExtractOpReturnMessage(os.Args[3])
 		if err != nil {
 			fmt.Println("Failed to extract OP_RETURN:", err)
 			return
 		}
-
-		fmt.Println("Extracted OP_RETURN message:", messageStr)
-
-		// Verify that OP_RETURN matches JSON content + signature
-		err = scripts.VerifyPaymentMessageWithExtracted(messageStr, jsonPath)
-		if err != nil {
+		fmt.Println("Extracted OP_RETURN message:", msg)
+		if err := scripts.VerifyPaymentMessageWithExtracted(msg, os.Args[2], statePath); err != nil {
 			fmt.Println("Signature or content mismatch:", err)
 		} else {
 			fmt.Println("Signature and OP_RETURN match verified.")
 		}
-
-	case "fund-offchain":
-		if len(os.Args) < 3 {
-			fmt.Println("Usage: go run main.go fund-offchain <amount>")
-			return
-		}
-		amountStr := os.Args[2]
-		var amount float64
-		fmt.Sscanf(amountStr, "%f", &amount)
-
-		err := txbuilder.FundMultisigFromBobOffchain("data/state.json", amount)
-		if err != nil {
-			fmt.Println("Off-chain funding error:", err)
-		}
-	case "set-htlc-tx":
-		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run main.go set-htlc-tx <txid> <vout>")
-			return
-		}
-		txid := os.Args[2]
-		var vout uint32
-		fmt.Sscanf(os.Args[3], "%d", &vout)
-
-		err := txbuilder.UpdateHTLCTx("data/state.json", txid, vout)
-		if err != nil {
-			fmt.Println("Error updating HTLC txid/vout:", err)
-		}
-
-	default:
-		fmt.Println("Unknown command:", cmd)
 	}
 }
 
 func parseInt64(s string) int64 {
-	var val int64
-	fmt.Sscanf(s, "%d", &val)
-	return val
+	var i int64
+	fmt.Sscanf(s, "%d", &i)
+	return i
 }

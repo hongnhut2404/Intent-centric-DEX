@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -28,14 +29,14 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 		return
 	}
 
-	// Generate private key
+	// Generate key pair
 	privKey, err := btcec.NewPrivateKey()
 	if err != nil {
 		panic(err)
 	}
 	pubKey := privKey.PubKey()
 
-	// Generate address for regtest
+	// Generate regtest address
 	address, err := btcutil.NewAddressPubKey(pubKey.SerializeCompressed(), &chaincfg.RegressionNetParams)
 	if err != nil {
 		panic(err)
@@ -52,7 +53,7 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 	fmt.Println("Public Key :", keyInfo.PubKey)
 	fmt.Println("Address    :", keyInfo.Address)
 
-	// Load existing state.json if it exists
+	// Load existing state if available
 	var state State
 	if _, err := os.Stat(stateFile); err == nil {
 		data, err := os.ReadFile(stateFile)
@@ -61,25 +62,25 @@ func GenerateAndStoreKeys(stateFile string, role string) {
 		}
 	}
 
-	// Update state with new key
+	// Update key based on role
 	if role == "alice" {
 		state.Alice = keyInfo
 	} else {
 		state.Bob = keyInfo
 	}
 
-	// Save back to state file
+	// Ensure directory exists
+	dir := filepath.Dir(stateFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		panic(fmt.Errorf("failed to create directory: %v", err))
+	}
+
+	// Save updated state
 	newData, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		panic(err)
 	}
 
-	// Ensure directory exists
-	if err := os.MkdirAll("data", 0755); err != nil {
-		panic(fmt.Errorf("failed to create data directory: %v", err))
-	}
-
-	// then save
 	if err := os.WriteFile(stateFile, newData, 0644); err != nil {
 		panic(err)
 	}

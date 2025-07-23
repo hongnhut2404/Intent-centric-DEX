@@ -114,41 +114,44 @@ go run main.go generate-message <secret> <amount>
 
 ## Step 11: Verify OP_RETURN and Extract Info
 ```bash
-go run main.go verify-opreturn data/payment_message.json data/payment_opreturn.txt
+go run main.go verify-opreturn ../../data-script/payment_message.json ../../data-script/payment_opreturn.txt
 ```
 
 ## Step 8: Create HTLC Based on OP_RETURN Info
 ```bash
-cd ../create-HTLC-contract
+cd ../htlc/create-htlc
 go run *.go
 ```
 
 ## Step 9: Fund the HTLC in One Step
 ```bash
-cd ../fund-HTLC
+cd ../fund
 go run main.go
+bitcoin-cli sendrawtransaction <txid>
 ```
 
 ## Step 10: Scan HTLC Address to Save as UTXO
 ```bash
-bitcoin-cli scantxoutset start '["addr(<address>)"]' > ../../data-script/utxo-htlc.json
+bitcoin-cli scantxoutset start '["addr(<htlc-address>)"]' > ../../../data-script/utxo-htlc.json
+
 ```
 
 ## Step 11: Create Redeem Transaction (Alice Redeems BTC)
 ```bash
-cd ../create-redeem-transaction
-go run main.go
+cd ../create-redeem
+go run *.go
 ```
 
 ## Step 12: Sign Redeem Transaction
 ```bash
-cd ../sign-redeem-transaction
-go run main.go
+cd ../sign-redeem
+go run *.go <secret>
 ```
 
 ## Step 13: Broadcast Redeem Transaction
 ```bash
 bitcoin-cli sendrawtransaction <signed_redeem_tx>
+
 ```
 
 ## Step 14: Generate 1 Block to Confirm

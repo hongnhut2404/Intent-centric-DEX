@@ -1,3 +1,0 @@
-Private Key (WIF): cRrdgkzSHm8Vh8brutJ92dLPtMWiwBwB6keMExGfGNaFbsqA17x8
-Public Key: 02578db1df79bb2068c4fc808ec9da1a8c3cb35d654b1599c9c7ea8f3dcb358958
-Address (regtest bech32): bcrt1qk283starw0cqjepyjxkrwgpu8lruxh77rvggx2

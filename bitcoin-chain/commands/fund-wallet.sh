@@ -16,7 +16,7 @@ initial_height=$(./bin/bitcoin-cli getblockcount)
 
 # 3. Fund sender wallet
 # ./bin/bitcoin-cli sendtoaddress bcrt1qh3py35f24dfgx0y6uaznfx66vhm88nh93qvpd0 100
-bob_address=$(jq -r '.bob.address' ./src/payment-channel/data/state.json)
+bob_address=$(jq -r '.bob.address' ./data-script/state.json)
 
 # Confirm it's stored correctly
 echo "Sending to Bob: $bob_address"
