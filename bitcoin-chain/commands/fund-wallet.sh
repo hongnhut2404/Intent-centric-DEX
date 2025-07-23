@@ -1,5 +1,5 @@
 #!/bin/bash
-
+sleep 1
 if [[ ! -f ./mineraddress.txt ]]; then
     echo "Error: mineraddress.txt not found in $(pwd)"
     exit 1

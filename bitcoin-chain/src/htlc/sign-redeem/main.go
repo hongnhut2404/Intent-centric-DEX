@@ -99,16 +99,26 @@ func readHTLCInfo() (map[string]interface{}, error) {
 func readSecretPreimage() (string, error) {
 	path := os.Getenv("EXCHANGE_DATA_HTLC")
 	if path == "" {
-		return "", fmt.Errorf("HTLC_DATA not set in .env")
+		return "", fmt.Errorf("EXCHANGE_DATA_HTLC not set in .env")
 	}
 	data, err := ReadInput(path)
 	if err != nil {
 		return "", err
 	}
 
-	secret, ok := data["secret"].(string)
+	htlcs, ok := data["htlcs"].([]interface{})
+	if !ok || len(htlcs) == 0 {
+		return "", fmt.Errorf("missing or invalid 'htlcs' field")
+	}
+
+	firstHTLC, ok := htlcs[0].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("invalid structure in 'htlcs[0]'")
+	}
+
+	secret, ok := firstHTLC["secret"].(string)
 	if !ok || len(secret) == 0 {
-		return "", fmt.Errorf("missing or invalid 'secret' field")
+		return "", fmt.Errorf("missing or invalid 'secret' field in htlcs[0]")
 	}
 
 	return secret, nil

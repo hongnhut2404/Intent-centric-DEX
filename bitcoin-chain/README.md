@@ -128,7 +128,7 @@ go run *.go
 cd ../fund
 go run *.go
 ```
-
+sleep 60
 ## Step 14: Scan HTLC Address to Save as UTXO
 ```bash
 cd ../scan-htlc
