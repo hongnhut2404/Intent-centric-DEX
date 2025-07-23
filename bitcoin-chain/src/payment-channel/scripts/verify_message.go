@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -103,11 +102,7 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string, statePa
 		return fmt.Errorf("invalid OP_RETURN format: expected 'amount|secret_hash'")
 	}
 
-	amountFloat, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return fmt.Errorf("invalid amount in OP_RETURN: %v", err)
-	}
-	amountStr := strconv.FormatFloat(amountFloat, 'f', -1, 64)
+	amountStr := parts[0] // preserve exact format e.g., "8.00000000"
 	secretHash := parts[1]
 
 	// Load payment message
@@ -122,16 +117,19 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string, statePa
 		return fmt.Errorf("failed to parse payment message: %v", err)
 	}
 
-	if amountFloat != msg.BTCAmount {
-		return fmt.Errorf("amount mismatch: expected %.8f, got %.8f", amountFloat, msg.BTCAmount)
+	// Compare values
+	msgAmountStr := fmt.Sprintf("%.8f", msg.BTCAmount)
+	if msgAmountStr != amountStr {
+		return fmt.Errorf("amount mismatch: expected %s, got %s", msgAmountStr, amountStr)
 	}
+
 	if msg.SecretHash != secretHash {
 		return fmt.Errorf("secret hash mismatch")
 	}
 
 	// Verify signature
-	digest := sha256.Sum256([]byte(msg.SecretHash + "|" + amountStr))
-	fmt.Println("Verifying message:", msg.SecretHash+"|"+amountStr)
+	digest := sha256.Sum256([]byte(amountStr + "|" + secretHash))
+	fmt.Println("Verifying message:", amountStr+"|"+secretHash)
 
 	pubBytes, err := hex.DecodeString(msg.PubKey)
 	if err != nil {
@@ -156,11 +154,11 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string, statePa
 	}
 	fmt.Println("Signature verification successful ✅")
 
+	// Add Bob's pubkey to message for debugging/reference
 	bobPubKey, err := loadBobPubKey(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to load Bob's pubkey: %v", err)
 	}
-
 	if err := AddSenderPubKeyToMessage(jsonPath, bobPubKey); err != nil {
 		return fmt.Errorf("failed to inject sender_pubkey: %v", err)
 	}

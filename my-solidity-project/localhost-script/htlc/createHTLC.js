@@ -4,6 +4,16 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
+function generateRandomSecret(length = 6) {
+  const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    const randIndex = Math.floor(Math.random() * charset.length);
+    result += charset[randIndex];
+  }
+  return result;
+}
+
 async function main() {
   const buyIntentId = 0;
   const allSigners = await hre.ethers.getSigners();
@@ -32,8 +42,7 @@ async function main() {
   const matchedTradeCount = await intentMatching.matchedTradeCount();
   if (matchedTradeCount === 0n) throw new Error("No matched trades found");
 
-  const secretBytes = crypto.randomBytes(8); 
-  const secret = secretBytes.toString("hex"); 
+  const secret = generateRandomSecret(6);
 
   const hashKeccak = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
   const hashSha256 = crypto.createHash("sha256").update(secret).digest("hex");
@@ -126,7 +135,7 @@ async function main() {
       secret,
       hashKeccak,
       hashSha256,
-      btcAmount: parseFloat(hre.ethers.utils.formatUnits(trade.btcAmount, 8)), 
+      btcAmount: Number((Number(trade.btcAmount) / 1e8).toFixed(8)) 
     });
   }
 

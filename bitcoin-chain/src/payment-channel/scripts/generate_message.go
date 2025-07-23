@@ -69,7 +69,8 @@ func GeneratePaymentMessage(secret string, btcAmountStr string, outputPath strin
 	secretHash := hex.EncodeToString(secretHashBytes[:])
 
 	// Sign message hash
-	raw := []byte(secretHash + "|" + btcAmountStr)
+	formattedAmount := fmt.Sprintf("%.8f", btcAmount)
+	raw := []byte(formattedAmount + "|" + secretHash)
 	digest := sha256.Sum256(raw)
 	sig := ecdsa.Sign(privKey, digest[:])
 

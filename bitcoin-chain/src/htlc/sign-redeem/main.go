@@ -97,7 +97,7 @@ func readHTLCInfo() (map[string]interface{}, error) {
 }
 
 func readSecretPreimage() (string, error) {
-	path := os.Getenv("HTLC_DATA")
+	path := os.Getenv("EXCHANGE_DATA_HTLC")
 	if path == "" {
 		return "", fmt.Errorf("HTLC_DATA not set in .env")
 	}
@@ -119,11 +119,11 @@ func main() {
 	loadEnv()
 	netParams := &chaincfg.RegressionNetParams
 
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go <secret>")
+	secret, err := readSecretPreimage()
+	if err != nil {
+		fmt.Printf("Error reading secret from exchange data: %v\n", err)
 		return
 	}
-	secret := os.Args[1]
 
 	txHex, err := readRedeemTransaction()
 	if err != nil {

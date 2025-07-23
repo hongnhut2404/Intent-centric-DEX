@@ -55,7 +55,10 @@ func readUTXO() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	unspentsRaw := data["unspents"].([]interface{})
+	unspentsRaw, ok := data["unspents"].([]interface{})
+	if !ok || len(unspentsRaw) == 0 {
+		return nil, fmt.Errorf("no unspents found in UTXO file: %s", path)
+	}
 	return unspentsRaw[0].(map[string]interface{}), nil
 }
 
