@@ -8,12 +8,12 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/joho/godotenv"
@@ -50,10 +50,20 @@ func ReadInput(filePath string) (map[string]interface{}, error) {
 	return data, nil
 }
 
+func broadcastViaBitcoinCli(rawHex string) error {
+	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", rawHex)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("bitcoin-cli failed: %v\n%s", err, string(output))
+	}
+	fmt.Println("Broadcast successful! TXID:", string(output))
+	return nil
+}
+
 func FundHTLC() error {
 	loadEnv()
 
-	// Load HTLC P2SH address
+	// Load HTLC address
 	htlcFile := os.Getenv("ADDRESS_TEST")
 	if htlcFile == "" {
 		return fmt.Errorf("ADDRESS_TEST is not set in .env")
@@ -69,7 +79,7 @@ func FundHTLC() error {
 	htlc := htlcData["HTLC"].([]interface{})[0].(map[string]interface{})
 	htlcAddr := htlc["address"].(string)
 
-	// Load UTXO data
+	// Load UTXO
 	utxoFile := os.Getenv("UTXO_JSON")
 	if utxoFile == "" {
 		return fmt.Errorf("UTXO_JSON is not set in .env")
@@ -82,18 +92,16 @@ func FundHTLC() error {
 	if err := json.Unmarshal(utxoRaw, &utxo); err != nil {
 		return fmt.Errorf("invalid JSON in utxo.json: %v", err)
 	}
-	unspents := utxo["unspents"].([]interface{})
-	first := unspents[0].(map[string]interface{})
-
+	first := utxo["unspents"].([]interface{})[0].(map[string]interface{})
 	txidStr := first["txid"].(string)
 	vout := int(first["vout"].(float64))
 	utxoAmount := btcutil.Amount(first["amount"].(float64) * 1e8)
 	scriptPubKeyHex := first["scriptPubKey"].(string)
 
-	// Load BTC amount from payment message
+	// Load BTC amount from message
 	msgPath := os.Getenv("PAYMENT_MESSAGE_HTLC")
 	if msgPath == "" {
-		return fmt.Errorf("PAYMENT_MESSAGE_HTLC is not set in .env")
+		return fmt.Errorf("PAYMENT_MESSAGE is not set in .env")
 	}
 	msg, err := ReadInput(msgPath)
 	if err != nil {
@@ -106,11 +114,8 @@ func FundHTLC() error {
 		return fmt.Errorf("UTXO amount (%d) < required (btc: %d + fee: %d)", utxoAmount, btcAmount, fee)
 	}
 
-	// Load Bob's private key
+	// Load Bob’s key
 	statePath := os.Getenv("STATE_PATH_HTLC")
-	if statePath == "" {
-		return fmt.Errorf("STATE_PATH_HTLC is not set in .env")
-	}
 	state, err := ReadInput(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to read state.json: %v", err)
@@ -122,7 +127,7 @@ func FundHTLC() error {
 	bobAddr, _ := btcutil.DecodeAddress(bob["address"].(string), &chaincfg.RegressionNetParams)
 	bobScript, _ := txscript.PayToAddrScript(bobAddr)
 
-	// Construct raw tx
+	// Create transaction
 	tx := wire.NewMsgTx(wire.TxVersion)
 	txHash, _ := chainhash.NewHashFromStr(txidStr)
 	tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txHash, uint32(vout)), nil, nil))
@@ -132,13 +137,13 @@ func FundHTLC() error {
 	htlcScript, _ := txscript.PayToAddrScript(htlcObj)
 	tx.AddTxOut(wire.NewTxOut(int64(btcAmount), htlcScript))
 
-	// Output 2: Change (optional)
+	// Output 2: Change
 	change := utxoAmount - btcAmount - fee
 	if change > 0 {
 		tx.AddTxOut(wire.NewTxOut(int64(change), bobScript))
 	}
 
-	// Sign
+	// Sign input
 	scriptPubKey, _ := hex.DecodeString(scriptPubKeyHex)
 	sigScript, err := txscript.SignatureScript(tx, 0, scriptPubKey, txscript.SigHashAll, privKey, true)
 	if err != nil {
@@ -146,30 +151,13 @@ func FundHTLC() error {
 	}
 	tx.TxIn[0].SignatureScript = sigScript
 
-	// Print tx hex
+	// Encode and broadcast
 	var buf bytes.Buffer
 	tx.Serialize(&buf)
-	fmt.Println("Raw Signed Transaction:")
-	fmt.Println(hex.EncodeToString(buf.Bytes()))
+	rawTxHex := hex.EncodeToString(buf.Bytes())
+	fmt.Println("Broadcasting Raw Transaction...")
 
-	// Send via RPC
-	client, err := rpcclient.New(&rpcclient.ConnConfig{
-		Host:         os.Getenv("RPC_HOST"),
-		User:         os.Getenv("RPC_USER"),
-		Pass:         os.Getenv("RPC_PASS"),
-		HTTPPostMode: true,
-		DisableTLS:   true,
-	}, nil)
-	if err != nil {
-		return fmt.Errorf("failed to connect RPC: %v", err)
-	}
-	txID, err := client.SendRawTransaction(tx, false)
-	if err != nil {
-		return fmt.Errorf("broadcast failed: %v", err)
-	}
-	fmt.Println("Broadcasted HTLC funding TXID:", txID.String())
-
-	return nil
+	return broadcastViaBitcoinCli(rawTxHex)
 }
 
 func main() {

@@ -78,8 +78,8 @@ Alice creates the HTLC on-chain.
 ```bash
 npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
 npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost
-BUY_ID=0 npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
-npx hardhat run localhost-script/htlc/refundHTLC.js --network localhost
+# BUY_ID=0 npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
+# npx hardhat run localhost-script/htlc/refundHTLC.js --network localhost
 # Input: htlcAddress, recipient address, timelock
 # Output: secret (preimage), hash(secret) (sha256)
 ```
@@ -117,55 +117,54 @@ go run main.go generate-message <secret> <amount>
 go run main.go verify-opreturn ../../data-script/payment_message.json ../../data-script/payment_opreturn.txt
 ```
 
-## Step 8: Create HTLC Based on OP_RETURN Info
+## Step 12: Create HTLC Based on OP_RETURN Info
 ```bash
 cd ../htlc/create-htlc
 go run *.go
 ```
 
-## Step 9: Fund the HTLC in One Step
+## Step 13: Fund the HTLC in One Step
 ```bash
 cd ../fund
 go run main.go
-bitcoin-cli sendrawtransaction <txid>
 ```
 
-## Step 10: Scan HTLC Address to Save as UTXO
+## Step 14: Scan HTLC Address to Save as UTXO
 ```bash
 bitcoin-cli scantxoutset start '["addr(<htlc-address>)"]' > ../../../data-script/utxo-htlc.json
 
 ```
 
-## Step 11: Create Redeem Transaction (Alice Redeems BTC)
+## Step 15: Create Redeem Transaction (Alice Redeems BTC)
 ```bash
 cd ../create-redeem
 go run *.go
 ```
 
-## Step 12: Sign Redeem Transaction
+## Step 16: Sign Redeem Transaction
 ```bash
 cd ../sign-redeem
 go run *.go <secret>
 ```
 
-## Step 13: Broadcast Redeem Transaction
+## Step 17: Broadcast Redeem Transaction
 ```bash
 bitcoin-cli sendrawtransaction <signed_redeem_tx>
 
 ```
 
-## Step 14: Generate 1 Block to Confirm
+## Step 18: Generate 1 Block to Confirm
 ```bash
 bitcoin-cli generate 1
 ```
 ```
 
-## Step 16: Alice Reveals the Secret
+## Step 19: Alice Reveals the Secret
 Once Alice redeems BTC, the `secret` becomes public on the blockchain.
 
 ---
 
-## Step 17: Bob Uses Secret to Claim ETH
+## Step 20: Bob Uses Secret to Claim ETH
 Bob uses the revealed secret to claim ETH from the HTLC contract on Ethereum.
 
 ```bash
