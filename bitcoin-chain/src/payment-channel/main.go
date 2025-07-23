@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -97,11 +98,47 @@ func main() {
 		}
 
 	case "generate-message":
-		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run main.go generate-message <secret> <btc_amount>")
+		exchangePath := os.Getenv("EXCHANGE_DATA")
+		if exchangePath == "" {
+			fmt.Println("EXCHANGE_DATA not set in .env")
 			return
 		}
-		err := scripts.GeneratePaymentMessage(os.Args[2], os.Args[3], paymentMessagePath, opreturnTxPath, statePath)
+
+		exchangeDataRaw, err := os.ReadFile(exchangePath)
+		if err != nil {
+			fmt.Println("Failed to read exchange-data.json:", err)
+			return
+		}
+
+		var exchangeData struct {
+			Success bool `json:"success"`
+			HTLCs   []struct {
+				Secret    string  `json:"secret"`
+				BtcAmount float64 `json:"btcAmount"`
+			} `json:"htlcs"`
+		}
+
+		if err := json.Unmarshal(exchangeDataRaw, &exchangeData); err != nil {
+			fmt.Println("Invalid JSON in exchange-data.json:", err)
+			return
+		}
+		if len(exchangeData.HTLCs) == 0 {
+			fmt.Println("No HTLCs found in exchange data")
+			return
+		}
+
+		// Get the shared secret (assumed same for all HTLCs)
+		secret := exchangeData.HTLCs[0].Secret
+
+		// Sum up all BTC amounts
+		var totalBTC float64
+		for _, htlc := range exchangeData.HTLCs {
+			totalBTC += htlc.BtcAmount
+		}
+
+		btcAmountStr := fmt.Sprintf("%.8f", totalBTC)
+
+		err = scripts.GeneratePaymentMessage(secret, btcAmountStr, paymentMessagePath, opreturnTxPath, statePath)
 		if err != nil {
 			fmt.Println("Generate error:", err)
 		}
