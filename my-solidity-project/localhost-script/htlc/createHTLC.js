@@ -32,7 +32,9 @@ async function main() {
   const matchedTradeCount = await intentMatching.matchedTradeCount();
   if (matchedTradeCount === 0n) throw new Error("No matched trades found");
 
-  const secret = "mysecret" + Date.now();
+  const secretBytes = crypto.randomBytes(8); 
+  const secret = secretBytes.toString("hex"); 
+
   const hashKeccak = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
   const hashSha256 = crypto.createHash("sha256").update(secret).digest("hex");
 

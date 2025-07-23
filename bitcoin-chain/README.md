@@ -108,7 +108,7 @@ tmux send-keys -t bitcoin-chain-execute:bash.2 "./commands/fund-wallet.sh" C-m
 ## Step 10. Create Multisig Address
 ```bash
 cd src/payment-channel
-go run main.go generate-message <secret> <amount>
+go run main.go generate-message
 ```
 
 
