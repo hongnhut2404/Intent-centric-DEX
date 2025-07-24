@@ -10,7 +10,10 @@ contract HTLC {
     }
 
     modifier onlyAuthorized() {
-        require(msg.sender == authorizedCaller, "Only authorized caller can execute");
+        require(
+            msg.sender == authorizedCaller,
+            "Only authorized caller can execute"
+        );
         _;
     }
 
@@ -28,12 +31,10 @@ contract HTLC {
         bytes secret
     );
 
-    event Refunded(
-        bytes32 indexed id,
-        uint256 amount
-    );
+    event Refunded(bytes32 indexed id, uint256 amount);
 
     event Received(address indexed from, uint256 amount);
+    event SecretRevealed(bytes32 indexed lockId, string secret);
 
     struct LockData {
         address recipient;
@@ -55,7 +56,9 @@ contract HTLC {
         require(recipient != address(0), "Invalid recipient");
         require(timelock > block.timestamp, "Timelock must be in the future");
 
-        bytes32 id = keccak256(abi.encodePacked(recipient, secretHash, msg.value, timelock));
+        bytes32 id = keccak256(
+            abi.encodePacked(recipient, secretHash, msg.value, timelock)
+        );
         require(!isLocked[id], "Lock already exists");
 
         isLocked[id] = true;
@@ -101,6 +104,16 @@ contract HTLC {
             result[i] = lockData[allLockIds[i]];
         }
         return result;
+    }
+
+    function revealSecret(bytes32 lockId, string calldata secret) external {
+        require(isLocked[lockId], "Lock does not exist");
+        require(
+            keccak256(bytes(secret)) == lockData[lockId].secretHash,
+            "Invalid secret"
+        );
+
+        emit SecretRevealed(lockId, secret);
     }
 
     receive() external payable {

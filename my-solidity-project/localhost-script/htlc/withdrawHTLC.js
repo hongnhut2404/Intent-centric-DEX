@@ -1,15 +1,11 @@
 // scripts/htlc/withdrawHTLC.js
 
 const hre = require("hardhat");
-const readline = require("readline-sync");
 const fs = require("fs");
 const path = require("path");
 
 async function main() {
   const buyIntentId = parseInt(process.env.BUY_ID || "0");
-
-  const secret = readline.question("Enter the shared secret preimage: ");
-  const secretHash = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(secret));
 
   const allSigners = await hre.ethers.getSigners();
 
@@ -45,6 +41,15 @@ async function main() {
     return;
   }
 
+  async function fetchSecret(lockId) {
+    const eventFilter = htlc.filters.SecretRevealed(lockId);
+    const revealedEvents = await htlc.queryFilter(eventFilter);
+    if (revealedEvents.length === 0) {
+      throw new Error(`Secret not yet revealed for lockId: ${lockId}`);
+    }
+    return revealedEvents[0].args.secret;
+  }
+
   let successCount = 0;
 
   for (const event of events) {
@@ -52,9 +57,19 @@ async function main() {
 
     console.log(`\nWithdrawing HTLC: lockId=${lockId}, recipient=${recipient}`);
 
-    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
-    const calldata = htlc.interface.encodeFunctionData("withdraw", [lockId, hre.ethers.toUtf8Bytes(secret)]);
+    let secret;
+    try {
+      secret = await fetchSecret(lockId);
+    } catch (err) {
+      console.warn(`Skipping withdrawal for lockId ${lockId}: ${err.message}`);
+      continue;
+    }
 
+    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
+    const calldata = htlc.interface.encodeFunctionData("withdraw", [
+      lockId,
+      hre.ethers.toUtf8Bytes(secret),
+    ]);
 
     try {
       const submitTx = await multisig.connect(localSigners[0]).submitTransaction(htlcAddress, 0, calldata);

@@ -135,7 +135,7 @@ async function main() {
       secret,
       hashKeccak,
       hashSha256,
-      btcAmount: Number((Number(trade.btcAmount) / 1e8).toFixed(8)) 
+      btcAmount: Number((Number(trade.btcAmount) / 1e8).toFixed(8))
     });
   }
 
@@ -163,10 +163,19 @@ async function main() {
 
   // === Write to exchange-data.json
   if (htlcMetadata.length > 0) {
-    const outputJsonPath = path.resolve(__dirname, exchangePath);
-    fs.writeFileSync(outputJsonPath, JSON.stringify({ success: true, htlcs: htlcMetadata }, null, 2));
-    console.log(`HTLC metadata saved to: ${outputJsonPath}`);
+    const exportObjects = [
+      path.resolve(__dirname, "../../../bitcoin-chain/data-script/exchange-data.json"),
+      path.resolve(__dirname, "../../data/exchange-data.json"),
+    ];
+
+    for (const outputPath of exportObjects) {
+      const outputDir = path.dirname(outputPath);
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      fs.writeFileSync(outputPath, JSON.stringify({ success: true, htlcs: htlcMetadata }, null, 2));
+      console.log(`HTLC metadata saved to: ${outputPath}`);
+    }
   }
+
 }
 
 main().catch((err) => {
