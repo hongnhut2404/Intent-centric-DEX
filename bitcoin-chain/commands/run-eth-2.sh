@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Record start time
+start_time=$(date +%s%3N)
+echo "Start time: $start_time"
+
 # Stop on error
 set -e
 
@@ -16,3 +20,16 @@ npx hardhat run localhost-script/htlc/withdrawHTLC.js --network localhost
 
 echo ""
 echo "Process complete."
+
+# Record end time in milliseconds
+end_time=$(date +%s%3N)
+
+# Calculate elapsed time in milliseconds
+elapsed_ms=$((end_time - start_time))
+
+# Convert to seconds and milliseconds
+seconds=$((elapsed_ms / 1000))
+milliseconds=$((elapsed_ms % 1000))
+
+echo ""
+echo "Script completed in ${seconds}.${milliseconds} seconds."

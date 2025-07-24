@@ -1,4 +1,8 @@
 #!/bin/bash
+# Record start time
+start_time=$(date +%s%3N)
+echo "Start time: $start_time"
+
 
 echo "Deploying IntentMatching contract..."
 npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
@@ -35,3 +39,17 @@ npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
 
 echo "Viewing all HTLCs..."
 npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost
+
+
+# Record end time in milliseconds
+end_time=$(date +%s%3N)
+
+# Calculate elapsed time in milliseconds
+elapsed_ms=$((end_time - start_time))
+
+# Convert to seconds and milliseconds
+seconds=$((elapsed_ms / 1000))
+milliseconds=$((elapsed_ms % 1000))
+
+echo ""
+echo "Script completed in ${seconds}.${milliseconds} seconds."

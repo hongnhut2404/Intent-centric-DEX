@@ -1,3 +1,8 @@
+
+# Record start time
+start_time=$(date +%s%3N)
+echo "Start time: $start_time"
+
 echo "Generating payment message with secret and OP_RETURN..."
 cd src/payment-channel
 go run main.go generate-message
@@ -29,3 +34,16 @@ cd ../sign-redeem
 go run *.go
 
 echo "Workflow completed. You can now broadcast the signed transaction manually."
+
+# Record end time in milliseconds
+end_time=$(date +%s%3N)
+
+# Calculate elapsed time in milliseconds
+elapsed_ms=$((end_time - start_time))
+
+# Convert to seconds and milliseconds
+seconds=$((elapsed_ms / 1000))
+milliseconds=$((elapsed_ms % 1000))
+
+echo ""
+echo "Script completed in ${seconds}.${milliseconds} seconds."
