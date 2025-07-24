@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"os/exec"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -123,6 +124,14 @@ func signTransaction(input InputSignRedeemTransaction, netParams *chaincfg.Param
 	if err != nil {
 		return "", fmt.Errorf("error serializing transaction: %v", err)
 	}
+
+	// Broadcast using bitcoin-cli sendrawtransaction
+	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", hex.EncodeToString(signedTx.Bytes()))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to broadcast transaction: %v\n%s", err, output)
+	}
+	fmt.Printf("Transaction broadcasted successfully. TXID: %s\n", output)
 
 	return hex.EncodeToString(signedTx.Bytes()), nil
 }
