@@ -14,10 +14,18 @@
 }
 
 .dex-token-input {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
   background-color: #f0f0f0;
   border-radius: 12px;
   padding: 1rem;
-  margin-bottom: 1rem;
+}
+
+.dex-token-input label {
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #333;
 }
 
 .dex-token-amount {
@@ -28,44 +36,16 @@
   outline: none;
 }
 
-.dex-token-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.5rem;
-}
-
-.dex-token-value {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.dex-token-name {
-  font-weight: 500;
-}
-
-.dex-balance-text {
-  margin: 0.5rem 0 0 0;
-  font-size: 0.8rem;
-  color: #666;
-}
-
-.dex-swap-arrow {
-  text-align: center;
-  margin: 1rem 0;
-}
-
 .dex-swap-button {
   color: white;
   border: none;
   padding: 0.8rem;
-  border-radius: 12px;
+  border-radius: 8px;
   width: 100%;
   margin: 1rem 0;
   font-weight: 500;
   cursor: pointer;
   background-color: var(--primary-color);
-  border-radius: 8px;
 }
 
 .dex-swap-button:hover {
@@ -74,7 +54,6 @@
 
 .dex-rate-info {
   text-align: center;
-  color: #666;
   font-size: 0.9rem;
   margin: 1rem 0;
   padding: 0.5rem;
@@ -83,8 +62,8 @@
   color: #333;
 }
 
-.dex-rate-fee {
-  margin-top: 0.5rem;
+.dex-response-msg {
+  margin-top: 20px;
+  color: #4caf50;
+  font-weight: bold;
 }
-
-
