@@ -6,6 +6,10 @@
   --text-muted: #888;
 }
 
+body{
+  margin: 0;
+}
+
 .dex-app {
   min-height: 100vh;
   display: flex;
@@ -21,3 +25,4 @@
   align-items: center;
   padding: 20px;
 }
+

@@ -2,13 +2,41 @@ import './SwapCard.css';
 import { useState } from 'react';
 
 export default function SwapCard() {
-  const [fromAmount, setFromAmount] = useState('1');
-  const [toAmount, setToAmount] = useState('3110.44');
+  const [fromAmount, setFromAmount] = useState('0');
+  const [toAmount, setToAmount] = useState('0');
+  const [loading, setLoading] = useState(false);
+  const [responseMsg, setResponseMsg] = useState('');
+
+  const EXCHANGE_RATE = 3110.44;
 
   const handleFromAmountChange = (e) => {
     const value = e.target.value;
+    if (value === '' || isNaN(value)) {
+      setFromAmount('');
+      setToAmount('0');
+      return;
+    }
     setFromAmount(value);
-    setToAmount((parseFloat(value || 0) * 3110.44).toFixed(2));
+    setToAmount((parseFloat(value || 0) * EXCHANGE_RATE).toFixed(2));
+  };
+  const handleSubmitIntent = async () => {
+    setLoading(true);
+    setResponseMsg('');
+
+    // Simulate API delay
+    setTimeout(() => {
+      const receiveAmount = (parseFloat(fromAmount || 0) * EXCHANGE_RATE).toFixed(2);
+
+      // Simulated response
+      const mockResponse = {
+        receiveAmount,
+        status: 'success',
+        message: 'Intent submitted successfully!',
+      };
+
+      setResponseMsg(`${mockResponse.message} You will receive ${mockResponse.receiveAmount} DAL`);
+      setLoading(false);
+    }, 1000); // Simulate 1s API delay
   };
 
   return (
@@ -17,6 +45,7 @@ export default function SwapCard() {
       <div className="dex-token-input">
         <input
           type="number"
+          min="0"
           value={fromAmount}
           onChange={handleFromAmountChange}
           className="dex-token-amount"
@@ -30,7 +59,7 @@ export default function SwapCard() {
 
       <div className="dex-swap-arrow">
         <svg width="24" height="24" viewBox="0 0 24 24">
-          <path d="M16 10L12 14L8 10" stroke="#6200ee" strokeWidth="2"/>
+          <path d="M16 10L12 14L8 10" stroke="#6200ee" strokeWidth="2" />
         </svg>
       </div>
 
@@ -49,12 +78,24 @@ export default function SwapCard() {
         <p className="dex-balance-text">Balance: 0 DAL</p>
       </div>
 
-      <button className="dex-swap-button">Submit Intent</button>
+      <button
+        className="dex-swap-button"
+        onClick={handleSubmitIntent}
+        disabled={loading}
+      >
+        {loading ? 'Submitting...' : 'Submit Intent'}
+      </button>
 
       <div className="dex-rate-info">
-        1 ETH = 3,110.44 DAL ($3,106.74)
+        1 ETH = {EXCHANGE_RATE} DAL ($3,106.74)
         <div className="dex-rate-fee">$0.10: Fee</div>
       </div>
+
+      {responseMsg && (
+        <p className="dex-response-msg">
+          {responseMsg}
+        </p>
+      )}
     </div>
   );
 }
