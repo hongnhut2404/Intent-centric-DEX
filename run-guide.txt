@@ -1,0 +1,123 @@
+Atomic Swap Execution Guide
+
+This guide walks you through the full workflow to perform a cross-chain atomic swap between Ethereum and Bitcoin using Hashed Timelock Contracts (HTLCs) and intent matching.
+
+-------------------------------------------------------
+Step 0: Start Blockchain Environments
+-------------------------------------------------------
+
+[Terminal A: Ethereum Node]
+
+Start a local Ethereum node:
+$ npx hardhat node
+
+Leave this terminal running throughout the process.
+
+[Terminal B: Bitcoin Chain + Bitcoin Script Execution]
+
+Start the Bitcoin Regtest chain:
+$ cd bitcoin-chain
+$ mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
+
+This terminal will also be used later for Bitcoin Go script execution.
+
+-------------------------------------------------------
+Step 1: Ethereum Side — Intent Setup and Matching
+-------------------------------------------------------
+
+[Terminal C: Ethereum Script Execution]
+
+$ npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost  
+$ npx hardhat run localhost-script/matching-intent/deployMultisigWallet.js --network localhost  
+$ npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network localhost  
+$ npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost  
+$ npx hardhat run localhost-script/matching-intent/confirmSellIntent.js --network localhost  
+$ npx hardhat run localhost-script/matching-intent/viewAllIntents.js --network localhost  
+$ BUY_ID=0 npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost  
+$ TX_ID=3 npx hardhat run localhost-script/matching-intent/confirmMultisigTx.js --network localhost  
+
+-------------------------------------------------------
+Step 2: Ethereum Side — Create and Fund HTLCs
+-------------------------------------------------------
+
+[Terminal C]
+
+$ npx hardhat run localhost-script/htlc/deployHTLC.js --network localhost  
+$ npx hardhat run localhost-script/htlc/fund.js --network localhost  
+$ npx hardhat run localhost-script/htlc/createHTLC.js --network localhost  
+$ npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost  
+
+-------------------------------------------------------
+Step 3: Bitcoin Side — HTLC Creation and Signing
+-------------------------------------------------------
+
+[Terminal B: Continue from Bitcoin terminal]
+
+```bash
+echo "Creating empty address-test.json..."
+echo "{}" > ./data-script/address-test.json
+
+echo "Initializing Alice and Bob key pairs..."
+cd src/payment-channel
+go run main.go init alice
+go run main.go init bob
+
+echo "Funding Bob's wallet from mining node..."
+cd ../..
+
+sleep 1
+if [[ ! -f ./mineraddress.txt ]]; then
+    echo "Error: mineraddress.txt not found in $(pwd)"
+    exit 1
+fi
+
+address=$(cat ./mineraddress.txt)
+
+# Generate 103 blocks to miner address
+./bin/bitcoin-cli generatetoaddress 103 "$address"
+./bin/bitcoin-cli getwalletinfo
+
+# Get current block height
+initial_height=$(./bin/bitcoin-cli getblockcount)
+
+# Fund Bob
+bob_address=$(jq -r '.bob.address' ./data-script/state.json)
+echo "Sending to Bob: $bob_address"
+./bin/bitcoin-cli sendtoaddress "$bob_address" 100
+./bin/bitcoin-cli generatetoaddress 1 "$address"
+
+# Scan for UTXOs
+./bin/bitcoin-cli scantxoutset start "[\"addr($bob_address)\"]" > ./data-script/utxo.json
+echo "Send successfully"
+
+# Generate payment message
+cd src/payment-channel
+go run main.go generate-message
+
+# Verify OP_RETURN
+go run main.go verify-opreturn ../../data-script/payment_message.json ../../data-script/payment_opreturn.txt
+
+# Create Bitcoin HTLC
+cd ../htlc/create-htlc
+go run *.go
+
+# Fund the HTLC
+cd ../fund
+go run *.go
+
+# Wait for block confirmation
+sleep 600
+
+# Scan HTLC address
+cd ../scan-htlc
+go run *.go
+
+# Create redeem transaction
+cd ../create-redeem
+go run *.go
+
+# Sign the redeem transaction
+cd ../sign-redeem
+go run *.go
+
+echo "Workflow completed. You can now broadcast the signed transaction manually."

@@ -61,7 +61,7 @@ cd ../fund
 go run *.go
 
 echo "Waiting for funds to be mined into the HTLC (60 seconds)..."
-sleep 60
+sleep 600
 
 echo "Scanning HTLC address to collect UTXO data..."
 cd ../scan-htlc
