@@ -1,0 +1,45 @@
+/* src/components/IntentList/IntentList.css */
+.intent-list {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.intent-list h2 {
+  margin-top: 2rem;
+  font-size: 1.5rem;
+  color: #333;
+}
+
+.intent-list table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.intent-list th,
+.intent-list td {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.intent-list th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+  color: #222;
+}
+
+.intent-list tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.intent-list p {
+  margin-top: 1rem;
+  font-style: italic;
+  color: #666;
+}
