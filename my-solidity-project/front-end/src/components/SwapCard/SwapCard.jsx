@@ -1,5 +1,8 @@
 import './SwapCard.css';
 import { useState } from 'react';
+import { ethers } from 'ethers';
+import IntentMatchingABI from '../../contracts/IntentMatching.json';
+import intentAddress from '../../contracts/intent-matching-address.json';
 
 export default function SwapCard() {
   const [btcAmount, setBtcAmount] = useState('');
@@ -11,7 +14,7 @@ export default function SwapCard() {
 
   const calculateRate = (btc, eth) => {
     if (btc && eth && parseFloat(btc) > 0) {
-      return (parseFloat(eth) / parseFloat(btc)).toFixed(6);
+      return (parseFloat(eth) / parseFloat(btc)).toFixed(2);
     }
     return null;
   };
@@ -36,18 +39,45 @@ export default function SwapCard() {
     setLoading(true);
     setResponseMsg('');
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const mockResponse = {
-        status: 'success',
-        message: 'Buy Intent created successfully!',
-      };
+    try {
+      if (!window.ethereum) {
+        throw new Error('MetaMask not detected');
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const contract = new ethers.Contract(
+        intentAddress.address,
+        IntentMatchingABI.abi,
+        signer
+      );
+
+      const btcAmountParsed = ethers.parseUnits(btcAmount, 8); // BTC: 8 decimals (off-chain)
+      const ethAmountParsed = ethers.parseEther(ethAmount);     // ETH: 18 decimals
+      const locktime = Math.floor(Date.now() / 1000) + 3600;     // 1 hour later
+      const slippageValue = parseInt(slippage || '0');
+      const offchainId = ethers.id(`offchain-${Date.now()}`);
+
+      const tx = await contract.createBuyIntent(
+        btcAmountParsed,
+        ethAmountParsed,
+        locktime,
+        offchainId,
+        slippageValue
+      );
+
+      await tx.wait();
 
       setResponseMsg(
-        `${mockResponse.message} Rate: ${rate} ETH/BTC with ${slippage || 0}% slippage.`
+        `Buy Intent created successfully! Rate: ${rate} ETH/BTC with ${slippage || 0}% slippage.`
       );
-      setLoading(false);
-    }, 1000);
+    } catch (err) {
+      console.error(err);
+      setResponseMsg('Failed to create Buy Intent.');
+    }
+
+    setLoading(false);
   };
 
   return (
