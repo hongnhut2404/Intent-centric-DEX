@@ -1,6 +1,7 @@
 /* src/components/IntentList/IntentList.css */
 .intent-list {
-  padding: 2rem;
+  padding: 1rem 3rem 2rem 2rem;
+  
   max-width: 1000px;
   margin: 0 auto;
   background-color: #fff;
@@ -8,11 +9,18 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-.intent-list h2 {
-  margin-top: 2rem;
+.intent-list .intent-list-component{
+    margin-top: 1rem;
+}
+
+.intent-list .intent-list-component h2 {
+  margin-top: 0rem;
   font-size: 1.5rem;
   color: #333;
 }
+
+
+
 
 .intent-list table {
   width: 100%;

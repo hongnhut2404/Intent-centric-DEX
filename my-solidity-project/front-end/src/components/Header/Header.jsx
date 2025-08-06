@@ -5,7 +5,7 @@ export default function Header({ connected, setConnected, activeTab, setActiveTa
 
   return (
     <header className="dex-header">
-      <div className="logo">IntentSwap</div>
+      <div className="dex-logo">IntentSwap</div>
       <nav className="dex-nav">
         {tabs.map((tab) => (
           <div
@@ -17,7 +17,7 @@ export default function Header({ connected, setConnected, activeTab, setActiveTa
           </div>
         ))}
       </nav>
-      <button className="connect-button">
+      <button className="dex-connect-button">
         {connected ? 'Connected' : 'Connect'}
       </button>
     </header>
