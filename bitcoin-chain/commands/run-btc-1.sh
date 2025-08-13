@@ -7,6 +7,9 @@ echo "Start time: $start_time"
 echo "Creating empty address-test.json..."
 echo "{}" > ./data-script/address-test.json
 
+cd bitcoin-chain
+mux start -p ../.tmuxinator/bitcoin-chain-execute.yml
+
 echo "Initializing Alice and Bob key pairs..."
 cd src/payment-channel
 go run main.go init alice

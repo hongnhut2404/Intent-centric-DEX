@@ -82,11 +82,11 @@ async function main() {
       console.warn("No TradeMatched events found.");
     }
   } catch (err) {
-    if ((err.message || "").includes("already executed")) {
-      console.log(`Tx ${targetTxID} already executed.`);
-    } else {
-      console.error(`Execution failed: ${err.message}`);
-    }
+    // if ((err.message || "").includes("already executed")) {
+    //   console.log(`Tx ${targetTxID} already executed.`);
+    // } else {
+    //   console.error(`Execution failed: ${err.message}`);
+    // }
   }
 }
 

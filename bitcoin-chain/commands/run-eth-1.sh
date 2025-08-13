@@ -3,7 +3,7 @@
 start_time=$(date +%s%3N)
 echo "Start time: $start_time"
 
-
+cd my-solidity-project/
 echo "Deploying IntentMatching contract..."
 npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
 

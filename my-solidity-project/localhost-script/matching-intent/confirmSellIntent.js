@@ -67,7 +67,7 @@ async function main() {
     }
   }
 
-  console.log("✅ All pending SellIntents confirmed and executed (if eligible).");
+  console.log("All pending SellIntents confirmed and executed (if eligible).");
 }
 
 main().catch(err => {
