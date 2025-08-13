@@ -1,3 +1,6 @@
+echo "Creating empty address-test.json..."
+echo "{}" > ./data-script/address-test.json
+
 #!/bin/bash
 sleep 1
 if [[ ! -f ./mineraddress.txt ]]; then

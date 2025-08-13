@@ -41,7 +41,7 @@ async function main() {
       if ((err.message || "").includes("Already confirmed")) {
         console.log(`Tx ${targetTxID} already confirmed by ${signer.address}`);
       } else {
-        console.warn(`Confirmation by ${signer.address} failed: ${err.message}`);
+        // console.warn(`Confirmation by ${signer.address} failed: ${err.message}`);
       }
     }
   }
@@ -82,11 +82,11 @@ async function main() {
       console.warn("No TradeMatched events found.");
     }
   } catch (err) {
-    // if ((err.message || "").includes("already executed")) {
-    //   console.log(`Tx ${targetTxID} already executed.`);
-    // } else {
-    //   console.error(`Execution failed: ${err.message}`);
-    // }
+    if ((err.message || "").includes("already executed")) {
+      console.log(`Tx ${targetTxID} already executed.`);
+    } else {
+      console.error(`Execution failed: ${err.message}`);
+    }
   }
 }
 
