@@ -214,7 +214,7 @@ func SignCommitmentTxBob(statePath string) error {
 	if !aliceSigParsed.Verify(sighash, alicePub) {
 		return fmt.Errorf("Alice signature invalid")
 	}
-	fmt.Println("✅ Alice's signature verified")
+	fmt.Println("Alice's signature verified")
 
 	// bob signs
 	bobPriv, _ := btcec.PrivKeyFromBytes(decodeHex(state.Bob.PrivKey))

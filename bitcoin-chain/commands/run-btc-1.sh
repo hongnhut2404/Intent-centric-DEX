@@ -15,6 +15,7 @@ cd src/payment-channel
 go run main.go init alice
 go run main.go init bob
 
+# This is the fund wallet command. Use to fund the wallet of User (Bob) to start the transaction 
 echo "Funding Bob's wallet from mining node..."
 cd ../..
 #!/bin/bash
@@ -46,6 +47,8 @@ echo "Sending to Bob: $bob_address"
 # 5. Scan for UTXOs and write to JSON file
 ./bin/bitcoin-cli scantxoutset start "[\"addr($bob_address)\"]" > ./data-script/utxo.json
 
+# End of fund wallet command
+
 echo "Send successfully"
 
 echo "Generating payment message with secret and OP_RETURN..."
@@ -64,7 +67,8 @@ cd ../fund
 go run *.go
 
 echo "Waiting for funds to be mined into the HTLC (60 seconds)..."
-sleep 600
+sleep 60 
+#(Actually 600s in case block time = 600s)
 
 echo "Scanning HTLC address to collect UTXO data..."
 cd ../scan-htlc

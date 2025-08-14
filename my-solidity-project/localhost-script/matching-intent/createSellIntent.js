@@ -36,7 +36,9 @@ async function main() {
   const sellIntents = [
     { amountBTC: 1.0, minBuyETH: "0.75" },
     { amountBTC: 3.5, minBuyETH: "1.6" },
-    { amountBTC: 6.0, minBuyETH: "3.0" }
+    { amountBTC: 6.0, minBuyETH: "3.0" },
+    { amountBTC: 1.0, minBuyETH: "0.5" },
+    { amountBTC: 2.5, minBuyETH: "1.75" },
   ];
 
   for (let i = 0; i < sellIntents.length; i++) {

@@ -25,8 +25,8 @@ npx hardhat run localhost-script/matching-intent/viewAllIntents.js --network loc
 echo "Matching BuyIntent with ID = 0..."
 BUY_ID=0 npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost
 
-echo "Confirming multisig transaction with TX_ID = 3..."
-TX_ID=3 npx hardhat run localhost-script/matching-intent/confirmMultisigTx.js --network localhost
+echo "Confirming multisig transaction"
+npx hardhat run localhost-script/matching-intent/confirmMultisigTx.js --network localhost
 
 echo "Deploying HTLC contract..."
 npx hardhat run localhost-script/htlc/deployHTLC.js --network localhost
