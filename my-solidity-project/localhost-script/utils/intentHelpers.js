@@ -40,7 +40,7 @@ async function printAllIntents(contract) {
     console.log(`ID ${i}: {`);
     console.log(`  buyer: '${intent.buyer}',`);
     console.log(`  sellAmountBTC: ${Number(intent.sellAmount) / 1e8},`);
-    console.log(`  minBuyAmountETH: ${ethers.formatEther(intent.minBuyAmount)},`);
+    console.log(`  buyAmountETH: ${ethers.formatEther(intent.minBuyAmount)},`);
     console.log(`  status: ${intent.status},`);
     console.log(`  locktime: ${intent.locktime}`);
     console.log(`}`);
@@ -51,8 +51,8 @@ async function printAllIntents(contract) {
     const intent = await contract.sellIntents(i);
     console.log(`ID ${i}: {`);
     console.log(`  seller: '${intent.seller}',`);
-    console.log(`  sellAmountBTC: ${Number(intent.sellAmount) / 1e8},`);
-    console.log(`  minBuyAmountETH: ${ethers.formatEther(intent.minBuyAmount)},`);
+    console.log(`  buyAmountBTC: ${Number(intent.minBuyAmount) / 1e8},`);
+    console.log(`  sellAmountETH: ${ethers.formatEther(intent.sellAmount)},`);
     console.log(`  status: ${intent.status},`);
     console.log(`  deadline: ${intent.deadline}`);
     console.log(`}`);

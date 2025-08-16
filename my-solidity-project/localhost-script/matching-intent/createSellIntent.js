@@ -51,8 +51,8 @@ async function main() {
   for (let i = 0; i < sellIntents.length; i++) {
     const { sellETH, minBTC } = sellIntents[i];
 
-    const sellAmountETH = hre.ethers.parseEther(sellETH);
-    const minBuyAmountBTC = hre.ethers.parseUnits(minBTC, 8);
+    const sellAmountETH = hre.ethers.parseUnits(sellETH, 18);
+    const minBuyAmountBTC = BigInt(minBTC * 1e8);
     const offchainId = hre.ethers.encodeBytes32String(`sell-${i}-${Date.now()}`);
 
     console.log(`Submitting SellIntent #${i}: sell ${sellETH} ETH for min ${minBTC} BTC`);

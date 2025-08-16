@@ -1,8 +1,9 @@
-// App.jsx
+// src/App.jsx
 import { useState } from 'react';
 import Header from './components/Header/Header';
 import SwapCard from './components/SwapCard/SwapCard';
 import IntentList from './components/IntentList/IntentList';
+import MatchedList from './components/MatchedList/MatchedList'; // NEW
 import Footer from './components/Footer/Footer';
 import ChatIcon from './components/ChatIcon/ChatIcon';
 import { useLocalSigners } from './web3/LocalSignerContext';
@@ -11,19 +12,43 @@ import './App.css';
 
 export default function App() {
   const [connected, setConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState('Swap');
+  const [activeTab, setActiveTab] = useState('Swap');  // 'Swap' | 'Intents' | 'Matches'
   const [showRolePicker, setShowRolePicker] = useState(false);
-  const [role, setRole] = useState(null); // 'User' | 'MM'
+  const [role, setRole] = useState(null);              // 'User' | 'MM'
 
   const { userAddress, mmAddress } = useLocalSigners();
   const short = (a) => (a ? `${a.slice(0,6)}…${a.slice(-4)}` : '—');
 
   const handleConnectClick = () => setShowRolePicker(true);
   const handlePickRole = (picked) => {
-    setRole(picked);          // 'User' or 'MM'
+    setRole(picked);            // 'User' or 'MM'
     setConnected(true);
     setShowRolePicker(false);
-    setActiveTab('Swap');     // stay on Swap; card will switch by role
+    setActiveTab('Swap');       // stay on Swap; card switches by role
+  };
+
+  const renderContent = () => {
+    if (!connected) {
+      return (
+        <div style={{ color: 'white', padding: '2rem' }}>
+          <p style={{ marginBottom: 12 }}>
+            Click <strong>Connect</strong> to choose a role (User or MM).
+          </p>
+          <button onClick={handleConnectClick} className="dex-swap-button">Connect</button>
+        </div>
+      );
+    }
+
+    switch (activeTab) {
+      case 'Swap':
+        return <SwapCard role={role === 'MM' ? 'mm' : 'user'} />;
+      case 'Intents':
+        return <IntentList />;
+      case 'Matches':
+        return <MatchedList />;
+      default:
+        return <div style={{ color: 'white', padding: '2rem' }}>Coming Soon…</div>;
+    }
   };
 
   return (
@@ -33,7 +58,7 @@ export default function App() {
         setConnected={setConnected}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onConnectClick={handleConnectClick}
+        onConnectClick={handleConnectClick}   // opens role picker
       />
 
       {/* Status banner */}
@@ -49,16 +74,7 @@ export default function App() {
       </div>
 
       <main className="dex-main">
-        {!connected ? (
-          <div style={{ color: 'white', padding: '2rem' }}>
-            <p style={{ marginBottom: 12 }}>Click <strong>Connect</strong> to choose a role.</p>
-            <button onClick={handleConnectClick} className="dex-swap-button">Connect</button>
-          </div>
-        ) : activeTab === 'Swap' ? (
-          <SwapCard role={role === 'MM' ? 'mm' : 'user'} />
-        ) : (
-          <IntentList />
-        )}
+        {renderContent()}
       </main>
 
       <Footer />

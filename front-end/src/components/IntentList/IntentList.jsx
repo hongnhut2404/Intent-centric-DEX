@@ -132,8 +132,8 @@ export default function IntentList() {
                 <tr key={`buy-${index}`}>
                   <td>{index}</td>
                   <td className="addr">{intent.buyer}</td>
-                  <td>{Number(ethers.formatUnits(intent.sellAmount, 8)).toFixed(4)} BTC</td>
-                  <td>{Number(ethers.formatEther(intent.minBuyAmount)).toFixed(4)} ETH</td>
+                  <td>{Number(ethers.formatUnits(intent.sellAmount, 8)).toFixed(2)} BTC</td>
+                  <td>{Number(ethers.formatEther(intent.minBuyAmount)).toFixed(2)} ETH</td>
                   <td>{formatStatus(intent.status)}</td>
                 </tr>
               ))}
@@ -164,8 +164,8 @@ export default function IntentList() {
                 <tr key={`sell-${index}`}>
                   <td>{index}</td>
                   <td className="addr">{intent.seller}</td>
-                  <td>{Number(ethers.formatEther(intent.sellAmount)).toFixed(4)} ETH</td>
-                  <td>{Number(ethers.formatUnits(intent.minBuyAmount, 8)).toFixed(4)} BTC</td>
+                  <td>{Number(ethers.formatEther(intent.sellAmount)).toFixed(2)} ETH</td>
+                  <td>{Number(ethers.formatUnits(intent.minBuyAmount, 8)).toFixed(2)} BTC</td>
                   <td>{formatStatus(intent.status)}</td>
                 </tr>
               ))}

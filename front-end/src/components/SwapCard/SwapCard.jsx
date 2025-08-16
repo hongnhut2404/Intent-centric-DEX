@@ -57,8 +57,7 @@ export default function SwapCard({ role = 'user' }) {
         await tx.wait();
 
         setResponseMsg(
-          `✅ Buy Intent created! ${btcAmount} BTC ↔ ${ethAmount} ETH` +
-          (rate ? ` (rate ${rate} ETH/BTC)` : '') + `.`
+          `✅ Buy Intent created! ${btcAmount} BTC ↔ ${ethAmount} ETH`
         );
       } else {
         // SELL (MM)
@@ -95,8 +94,8 @@ export default function SwapCard({ role = 'user' }) {
 
   const disabled = loading || !btcAmount || !ethAmount;
 
-  const btcLabel = isBuy ? 'Amount of BTC' : 'Min BTC Expected';
-  const ethLabel = isBuy ? 'Amount of ETH' : 'Sell Amount (ETH)';
+  const btcLabel = isBuy ? 'Sell Amount BTC' : 'Buy Amount BTC';
+  const ethLabel = isBuy ? 'Buy Amount ETH' : 'Sell Amount (ETH)';
   const title = isBuy ? 'Create Buy Intent' : 'Create Sell Intent';
   const rateUnit = isBuy ? 'ETH/BTC' : 'BTC/ETH';
 
@@ -131,12 +130,6 @@ export default function SwapCard({ role = 'user' }) {
           inputMode="decimal"
         />
       </div>
-
-      {rate && (
-        <div className="dex-rate-info">
-          Rate: <strong>{rate}</strong> {rateUnit}
-        </div>
-      )}
 
       <button className="dex-swap-button" onClick={handleCreateIntent} disabled={disabled}>
         {loading ? 'Creating…' : `Create ${isBuy ? 'Buy' : 'Sell'} Intent`}
