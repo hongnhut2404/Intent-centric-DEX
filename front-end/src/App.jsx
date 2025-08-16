@@ -4,6 +4,7 @@ import Header from './components/Header/Header';
 import SwapCard from './components/SwapCard/SwapCard';
 import IntentList from './components/IntentList/IntentList';
 import MatchedList from './components/MatchedList/MatchedList'; // NEW
+import HTLCManager from './components/HTLCManager/HTLCManager'; // NEW
 import Footer from './components/Footer/Footer';
 import ChatIcon from './components/ChatIcon/ChatIcon';
 import { useLocalSigners } from './web3/LocalSignerContext';
@@ -12,7 +13,7 @@ import './App.css';
 
 export default function App() {
   const [connected, setConnected] = useState(false);
-  const [activeTab, setActiveTab] = useState('Swap');  // 'Swap' | 'Intents' | 'Matches'
+  const [activeTab, setActiveTab] = useState('Swap');  // 'Swap' | 'Intents' | 'Matches' | 'HTLCs'
   const [showRolePicker, setShowRolePicker] = useState(false);
   const [role, setRole] = useState(null);              // 'User' | 'MM'
 
@@ -46,6 +47,8 @@ export default function App() {
         return <IntentList />;
       case 'Matches':
         return <MatchedList />;
+      case 'HTLCs':
+        return <HTLCManager />;
       default:
         return <div style={{ color: 'white', padding: '2rem' }}>Coming Soon…</div>;
     }

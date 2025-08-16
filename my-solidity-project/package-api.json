@@ -1,0 +1,19 @@
+{
+  "name": "htlc-api-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "HTLC API server for Intent-centric DEX",
+  "main": "htlc-api-server.js",
+  "scripts": {
+    "start": "node htlc-api-server.js",
+    "dev": "nodemon htlc-api-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ethers": "^6.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
