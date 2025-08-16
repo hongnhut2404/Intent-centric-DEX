@@ -8,7 +8,7 @@ export default function Header({
   setActiveTab,
   onConnectClick,        // NEW: handler from App to open the role picker
 }) {
-  const tabs = ['Swap', 'Intents', 'Matches'];
+  const tabs = ['Swap', 'Intents', 'Matches', 'HTLC'];
 
   const handleConnect = () => {
     if (typeof onConnectClick === 'function') {

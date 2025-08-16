@@ -1,0 +1,33 @@
+.htlc-panel {
+  background: #0f172a;
+  color: #e5e7eb;
+  border: 1px solid #1f2937;
+  border-radius: 16px;
+  padding: 16px;
+  max-width: 920px;
+  width: 100%;
+}
+
+.htlc-actions {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.htlc-row {
+  display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.htlc-console {
+  background: #0b1220;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 12px;
+  font-family: ui-monospace, Menlo, monospace;
+  white-space: pre-wrap;
+  min-height: 220px;
+  line-height: 1.35;
+}
