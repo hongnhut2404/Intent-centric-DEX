@@ -34,9 +34,11 @@ async function main() {
 
   // Define sell intents
   const sellIntents = [
-    { amountBTC: 1.0, minBuyETH: "0.75" },
-    { amountBTC: 3.5, minBuyETH: "1.6" },
-    { amountBTC: 6.0, minBuyETH: "3.0" }
+    { amountBTC: 1.0, minBuyETH: "7.5" },
+    { amountBTC: 3.5, minBuyETH: "17.5" },
+    { amountBTC: 6.0, minBuyETH: "30.0" },
+    { amountBTC: 1.0, minBuyETH: "5.0" },
+    { amountBTC: 1.0, minBuyETH: "5.5" },
   ];
 
   for (let i = 0; i < sellIntents.length; i++) {

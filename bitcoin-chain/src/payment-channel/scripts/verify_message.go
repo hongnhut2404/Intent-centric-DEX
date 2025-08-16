@@ -152,7 +152,7 @@ func VerifyPaymentMessageWithExtracted(opReturn string, jsonPath string, statePa
 	if !sig.Verify(digest[:], pubKey) {
 		return fmt.Errorf("signature verification failed")
 	}
-	fmt.Println("Signature verification successful ✅")
+	fmt.Println("Signature verification successful")
 
 	// Add Bob's pubkey to message for debugging/reference
 	bobPubKey, err := loadBobPubKey(statePath)

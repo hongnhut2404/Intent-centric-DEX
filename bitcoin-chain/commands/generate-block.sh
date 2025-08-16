@@ -14,5 +14,5 @@ while :
 do
         echo "Generate a new block `date '+%d/%m/%Y %H:%M:%S'`"
         ./bin/bitcoin-cli generatetoaddress 1 $address
-        sleep 600
+        sleep 60
 done

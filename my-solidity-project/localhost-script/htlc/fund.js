@@ -11,7 +11,7 @@ async function main() {
 
     const tx = await sender.sendTransaction({
         to: multisigAddr,
-        value: hre.ethers.parseEther("10.0")
+        value: hre.ethers.parseEther("1000.0")
     });
 
     await tx.wait();

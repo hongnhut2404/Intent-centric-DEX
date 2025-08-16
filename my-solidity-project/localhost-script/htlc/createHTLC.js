@@ -50,7 +50,7 @@ async function main() {
   const htlcMetadata = [];
   let created = 0;
   let associated = 0;
-
+  console.log(matchedTradeCount);
   for (let i = 0n; i < matchedTradeCount; i++) {
     const trade = await intentMatching.matchedTrades(i);
     if (trade.buyIntentId !== BigInt(buyIntentId)) continue;

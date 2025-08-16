@@ -41,7 +41,7 @@ async function main() {
       if ((err.message || "").includes("Already confirmed")) {
         console.log(`Tx ${targetTxID} already confirmed by ${signer.address}`);
       } else {
-        console.warn(`Confirmation by ${signer.address} failed: ${err.message}`);
+        // console.warn(`Confirmation by ${signer.address} failed: ${err.message}`);
       }
     }
   }
