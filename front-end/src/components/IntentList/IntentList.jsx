@@ -1,27 +1,68 @@
-// src/components/IntentList/IntentList.jsx
-
-import { useEffect, useState } from 'react';
+// IntentList.jsx
+import { useEffect, useState, useRef } from 'react';
 import { ethers } from 'ethers';
 import IntentMatchingABI from '../../contracts/IntentMatching.json';
 import intentAddress from '../../contracts/intent-matching-address.json';
+import { useLocalSigners } from '../../web3/LocalSignerContext';
 import './IntentList.css';
 
 export default function IntentList() {
+  const { provider } = useLocalSigners();
   const [buyIntents, setBuyIntents] = useState([]);
   const [sellIntents, setSellIntents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+  const [netInfo, setNetInfo] = useState('');
+  const contractRef = useRef(null);
+
+  const formatStatus = (statusEnum) => {
+    const statuses = ['Pending', 'Partial', 'Filled', 'Cancelled'];
+    const index = Number(statusEnum);
+    return statuses[index] || 'Unknown';
+  };
+
+  const getContract = () => {
+    if (contractRef.current) return contractRef.current;
+    const c = new ethers.Contract(
+      intentAddress.address,
+      IntentMatchingABI.abi,
+      provider
+    );
+    contractRef.current = c;
+    return c;
+  };
 
   const loadIntents = async () => {
-    setLoading(true);
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const contract = new ethers.Contract(intentAddress.address, IntentMatchingABI.abi, provider);
+      setErr('');
+      setLoading(true);
 
-      const intentCountBuy = await contract.intentCountBuy();
-      const intentCountSell = await contract.intentCountSell();
+      const net = await provider.getNetwork();
+      setNetInfo(`chainId=${net.chainId.toString()}`);
 
-      const buyPromises = Array.from({ length: intentCountBuy }, (_, i) => contract.getBuyIntent(i));
-      const sellPromises = Array.from({ length: intentCountSell }, (_, i) => contract.getSellIntent(i));
+      const code = await provider.getCode(intentAddress.address);
+      if (code === '0x') {
+        throw new Error(
+          `No contract code at ${intentAddress.address} on chainId ${net.chainId}. ` +
+          `Check your local deploy & intent-matching-address.json.`
+        );
+      }
+
+      const contract = getContract();
+
+      const [countBuyBN, countSellBN] = await Promise.all([
+        contract.intentCountBuy(),
+        contract.intentCountSell(),
+      ]);
+      const countBuy = Number(countBuyBN);
+      const countSell = Number(countSellBN);
+
+      const buyPromises = Array.from({ length: countBuy }, (_, i) =>
+        contract.getBuyIntent(i)
+      );
+      const sellPromises = Array.from({ length: countSell }, (_, i) =>
+        contract.getSellIntent(i)
+      );
 
       const [buyData, sellData] = await Promise.all([
         Promise.all(buyPromises),
@@ -30,29 +71,54 @@ export default function IntentList() {
 
       setBuyIntents(buyData);
       setSellIntents(sellData);
-    } catch (error) {
-      console.error('Failed to load intents:', error);
+    } catch (e) {
+      console.error(e);
+      setErr(e.reason || e.message || 'Failed to load intents');
+      setBuyIntents([]);
+      setSellIntents([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     loadIntents();
   }, []);
 
-  const formatStatus = (statusEnum) => {
-    // statusEnum is a BigInt (enum), convert it to readable string
-    const statuses = ['Pending', 'Partial', 'Filled', 'Cancelled'];
-    const index = Number(statusEnum);
-    return statuses[index] || 'Unknown';
-  };
+  useEffect(() => {
+    const contract = getContract();
+
+    const onBuy = () => loadIntents();
+    const onSell = () => loadIntents();
+
+    try {
+      contract.on('BuyIntentCreated', onBuy);
+    } catch {}
+    try {
+      contract.on('SellIntentCreated', onSell);
+    } catch {}
+
+    return () => {
+      try { contract.off('BuyIntentCreated', onBuy); } catch {}
+      try { contract.off('SellIntentCreated', onSell); } catch {}
+    };
+  }, []);
 
   return (
     <div className="intent-list">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <button onClick={loadIntents} className="dex-swap-button">Refresh</button>
+        {netInfo && <span style={{ color: '#9ca3af' }}>{netInfo}</span>}
+        {loading && <span style={{ color: '#9ca3af' }}>Loading…</span>}
+        {err && <span style={{ color: '#ef4444' }}>{err}</span>}
+      </div>
+
       <div className="intent-list-component">
         <h2>Buy Intents</h2>
         {loading ? (
           <p>Loading...</p>
+        ) : buyIntents.length === 0 ? (
+          <p>No buy intents yet.</p>
         ) : (
           <table>
             <thead>
@@ -61,7 +127,6 @@ export default function IntentList() {
                 <th>Buyer</th>
                 <th>BTC</th>
                 <th>ETH</th>
-                <th>Slippage</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -72,7 +137,6 @@ export default function IntentList() {
                   <td className="addr">{intent.buyer}</td>
                   <td>{Number(ethers.formatUnits(intent.sellAmount, 8)).toFixed(4)} BTC</td>
                   <td>{Number(ethers.formatEther(intent.minBuyAmount)).toFixed(4)} ETH</td>
-                  <td>{intent.slippage}%</td>
                   <td>{formatStatus(intent.status)}</td>
                 </tr>
               ))}
@@ -81,10 +145,12 @@ export default function IntentList() {
         )}
       </div>
 
-      <div className="intent-list-component">
+      <div className="intent-list-component" style={{ marginTop: 24 }}>
         <h2>Sell Intents</h2>
         {loading ? (
           <p>Loading...</p>
+        ) : sellIntents.length === 0 ? (
+          <p>No sell intents yet.</p>
         ) : (
           <table>
             <thead>

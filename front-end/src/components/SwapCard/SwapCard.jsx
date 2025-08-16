@@ -1,91 +1,72 @@
+// src/components/SwapCard/SwapCard.jsx
 import './SwapCard.css';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ethers } from 'ethers';
-import IntentMatchingABI from '../../contracts/IntentMatching.json';
-import intentAddress from '../../contracts/intent-matching-address.json';
+import { useLocalSigners } from '../../web3/LocalSignerContext';
+import { intentMatchingWith } from '../../web3/contract';
 
 export default function SwapCard() {
+  const { userSigner } = useLocalSigners();
+
   const [btcAmount, setBtcAmount] = useState('');
   const [ethAmount, setEthAmount] = useState('');
-  const [rate, setRate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [responseMsg, setResponseMsg] = useState('');
 
-  const calculateRate = (btc, eth) => {
-    if (btc && eth && parseFloat(btc) > 0) {
-      return (parseFloat(eth) / parseFloat(btc)).toFixed(2);
-    }
-    return null;
-  };
+  const rate = useMemo(() => {
+    const b = parseFloat(btcAmount);
+    const e = parseFloat(ethAmount);
+    if (!isFinite(b) || !isFinite(e) || b <= 0) return null;
+    return (e / b).toFixed(6);
+  }, [btcAmount, ethAmount]);
 
-  const handleInputChange = (setter) => (e) => {
-    const value = e.target.value;
-    if (value === '' || isNaN(Number(value)) || parseFloat(value) < 0) {
-      setter('');
-      setRate(null);
-      return;
-    }
-    setter(value);
-
-    const newRate = calculateRate(
-      e.target.name === 'btc' ? value : btcAmount,
-      e.target.name === 'eth' ? value : ethAmount
-    );
-    setRate(newRate);
+  const onChangeNum = (setter, name) => (e) => {
+    const v = e.target.value.trim();
+    if (v === '') return setter('');
+    const num = Number(v);
+    if (!isFinite(num) || num < 0) return; // ignore invalid
+    // small clamp to avoid scientific notation issues
+    setter(v);
   };
 
   const handleCreateIntent = async () => {
     setLoading(true);
     setResponseMsg('');
-
     try {
-      if (!window.ethereum) {
-        throw new Error('MetaMask not detected');
-      }
+      if (!btcAmount || !ethAmount) throw new Error('Enter BTC and ETH amounts');
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
+      const contract = intentMatchingWith(userSigner);
 
-      const contract = new ethers.Contract(
-        intentAddress.address,
-        IntentMatchingABI.abi,
-        signer
-      );
-
-      const btcAmountParsed = ethers.parseUnits(btcAmount, 8); // BTC: 8 decimals (off-chain)
-      const ethAmountParsed = ethers.parseEther(ethAmount);    // ETH: 18 decimals
-      const locktime = Math.floor(Date.now() / 1000) + 3600;   // 1 hour later
+      const btcAmountParsed = ethers.parseUnits(btcAmount, 8); // BTC (off-chain units)
+      const ethAmountParsed = ethers.parseEther(ethAmount);    // ETH (wei)
+      const locktime = Math.floor(Date.now() / 1000) + 3600;   // +1 hour
       const offchainId = ethers.id(`offchain-${Date.now()}`);
-
-      // If your Solidity function still expects a slippage param, pass 0.
-      // If it no longer exists, remove the last argument and this variable.
-      const slippageValue = 0;
+      const slippageValue = 0; // contract expects a param; we pass 0
 
       const tx = await contract.createBuyIntent(
         btcAmountParsed,
         ethAmountParsed,
         locktime,
         offchainId,
-        slippageValue // remove this if your contract no longer has slippage
+        slippageValue
       );
-
-      // If your contract signature is now (btc, eth, locktime, offchainId) only, use:
-      // const tx = await contract.createBuyIntent(
-      //   btcAmountParsed, ethAmountParsed, locktime, offchainId
-      // );
-
       await tx.wait();
 
       setResponseMsg(
-        `Buy Intent created successfully! Rate: ${rate ?? '—'} ETH/BTC.`
+        `Buy Intent created! ${btcAmount} BTC for ${ethAmount} ETH (rate ${rate ?? '—'} ETH/BTC).`
       );
+      // Optional: clear inputs
+      // setBtcAmount('');
+      // setEthAmount('');
     } catch (err) {
       console.error(err);
-      setResponseMsg('Failed to create Buy Intent.');
+      setResponseMsg(`Failed to create Buy Intent: ${err.reason || err.message || err}`);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
+
+  const disabled = loading || !btcAmount || !ethAmount;
 
   return (
     <div className="dex-swap-card">
@@ -99,8 +80,10 @@ export default function SwapCard() {
           min="0"
           step="0.01"
           value={btcAmount}
-          onChange={handleInputChange(setBtcAmount)}
+          onChange={onChangeNum(setBtcAmount, 'btc')}
+          placeholder="0.0"
           className="dex-token-amount"
+          inputMode="decimal"
         />
       </div>
 
@@ -112,23 +95,25 @@ export default function SwapCard() {
           min="0"
           step="0.01"
           value={ethAmount}
-          onChange={handleInputChange(setEthAmount)}
+          onChange={onChangeNum(setEthAmount, 'eth')}
+          placeholder="0.0"
           className="dex-token-amount"
+          inputMode="decimal"
         />
       </div>
 
       {rate && (
         <div className="dex-rate-info">
-          Calculated Rate: <strong>{rate}</strong> ETH/BTC
+          Calculated Rate:&nbsp;<strong>{rate}</strong>&nbsp;ETH/BTC
         </div>
       )}
 
       <button
         className="dex-swap-button"
         onClick={handleCreateIntent}
-        disabled={loading || !btcAmount || !ethAmount}
+        disabled={disabled}
       >
-        {loading ? 'Creating...' : 'Create Buy Intent'}
+        {loading ? 'Creating…' : 'Create Buy Intent'}
       </button>
 
       {responseMsg && <p className="dex-response-msg">{responseMsg}</p>}

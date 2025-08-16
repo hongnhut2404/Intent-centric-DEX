@@ -1,0 +1,17 @@
+.mm-panel { color: #e5e7eb; padding: 1rem; }
+.mm-row { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+.mm-row label { width: 200px; color: #9ca3af; }
+.mm-row input {
+  padding: 6px 8px;
+  background: #111827;
+  border: 1px solid #374151;
+  color: #e5e7eb;
+  border-radius: 6px;
+}
+.mm-actions { margin: 8px 0 16px; }
+.mm-hr { margin: 16px 0; opacity: 0.25; border: none; border-top: 1px solid #1f2937; }
+.mm-info { margin-top: 8px; color: #9ca3af; }
+.mm-msg { margin-top: 8px; color: #93c5fd; }
+.mm-table { width: 100%; margin-top: 12px; border-collapse: collapse; }
+.mm-table th, .mm-table td { border-bottom: 1px solid #1f2937; padding: 8px; text-align: left; }
+.addr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
