@@ -38,9 +38,10 @@
   transition: transform .05s ease, background .15s ease, border-color .15s ease;
 }
 .role-option:hover { background: #0b1220; border-color: #475569; transform: translateY(-1px); }
+
 .role-title { font-weight: 700; margin-bottom: 4px; }
 .role-desc { font-size: 13px; color: #9ca3af; margin-bottom: 8px; }
-.role-addr { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: #cbd5e1; }
+.role-addr { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: #cbd5e1; word-break: break-all; }
 
 .role-cancel {
   width: 100%;

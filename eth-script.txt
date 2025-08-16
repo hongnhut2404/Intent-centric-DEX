@@ -1,6 +1,9 @@
 echo "Deploying IntentMatching contract..."
 npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
 
+echo "Set Market Maker to account #1"
+npx hardhat run localhost-script/matching-intent/setMarketMaker.js --network localhost
+
 echo "Deploying MultisigWallet contract..."
 npx hardhat run localhost-script/matching-intent/deployMultisigWallet.js --network localhost
 
@@ -9,9 +12,6 @@ npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network lo
 
 echo "Creating SellIntent..."
 npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost
-
-echo "Confirming SellIntent..."
-npx hardhat run localhost-script/matching-intent/confirmSellIntent.js --network localhost
 
 echo "Viewing all Buy and Sell intents..."
 npx hardhat run localhost-script/matching-intent/viewAllIntents.js --network localhost

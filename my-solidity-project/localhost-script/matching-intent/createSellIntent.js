@@ -1,89 +1,90 @@
+// npx hardhat run localhost-script/matching-intent/createSellIntent.direct.js --network localhost
 const hre = require("hardhat");
 const fs = require("fs");
 
 async function main() {
   const signers = await hre.ethers.getSigners();
 
-  // Load IntentMatching contract address
+  // Pick MM: default index 1, override with MM_INDEX
+  const mmIndex = process.env.MM_INDEX ? parseInt(process.env.MM_INDEX, 10) : 1;
+  if (Number.isNaN(mmIndex) || mmIndex < 0 || mmIndex >= signers.length) {
+    throw new Error(`Invalid MM_INDEX=${process.env.MM_INDEX}. There are ${signers.length} signers.`);
+  }
+  const marketMaker = signers[mmIndex];
+  console.log(`Using Market Maker signer [${mmIndex}]: ${marketMaker.address}`);
+
+  // Load address
   const { address: intentMatchingAddress } = JSON.parse(
     fs.readFileSync("data/intent-matching-address.json", "utf8")
   );
+  console.log("IntentMatching at:", intentMatchingAddress);
 
-  const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
-  const contract = await IntentMatching.attach(intentMatchingAddress);
+  // Get contract
+  const contract = await hre.ethers.getContractAt("IntentMatching", intentMatchingAddress);
 
-  // Get multisig wallet address from contract storage
-  const multisigAddress = await contract.multisigWallet();
-  console.log("Multisig wallet (on-chain):", multisigAddress);
-
-  const MultisigWallet = await hre.ethers.getContractFactory("MultisigWallet");
-  const multisig = await MultisigWallet.attach(multisigAddress);
-
-  // Get on-chain owners of the multisig
-  const owners = await multisig.getOwners();
-  console.log("Multisig owners:", owners);
-
-  // Map on-chain owners to local Hardhat signers
-  const signerMap = {};
-  for (const signer of signers) {
-    signerMap[signer.address.toLowerCase()] = signer;
+  // Ensure market maker is set on-chain to this signer
+  let currentMM;
+  try { currentMM = await contract.marketMaker(); } catch { currentMM = null; }
+  if (currentMM == null) {
+    console.log("ABI doesn’t expose marketMaker(); ensure ABI is up to date.");
+  } else if (currentMM.toLowerCase() !== marketMaker.address.toLowerCase()) {
+    console.log(`Updating marketMaker: ${currentMM} → ${marketMaker.address}`);
+    const owner = signers[0];
+    await (await contract.connect(owner).setMarketMaker(marketMaker.address)).wait();
+    const verify = await contract.marketMaker();
+    console.log("marketMaker now:", verify);
+  } else {
+    console.log("marketMaker already set to:", currentMM);
   }
 
-  const deadline = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
-  const offchainId = hre.ethers.encodeBytes32String("sell-eth");
+  const deadline = Math.floor(Date.now() / 1000) + 3600;
 
-  // Define sell intents
+  // Sell intents: (sell ETH, min BTC)
   const sellIntents = [
-    { amountBTC: 1.0, minBuyETH: "7.5" },
-    { amountBTC: 3.5, minBuyETH: "17.5" },
-    { amountBTC: 6.0, minBuyETH: "30.0" },
-    { amountBTC: 1.0, minBuyETH: "5.0" },
-    { amountBTC: 1.0, minBuyETH: "5.5" },
+    { sellETH: "100.0", minBTC: "4.0" },
+    { sellETH: "50.0",  minBTC: "2.0" },
+    { sellETH: "10.0",  minBTC: "0.35" },
   ];
 
+  const mmContract = contract.connect(marketMaker);
+
   for (let i = 0; i < sellIntents.length; i++) {
-    const { amountBTC, minBuyETH } = sellIntents[i];
+    const { sellETH, minBTC } = sellIntents[i];
 
-    const sellAmount = BigInt(amountBTC * 1e8); // BTC in satoshis
-    const minBuyAmount = hre.ethers.parseUnits(minBuyETH, 18); // ETH in wei
+    const sellAmountETH = hre.ethers.parseEther(sellETH);
+    const minBuyAmountBTC = hre.ethers.parseUnits(minBTC, 8);
+    const offchainId = hre.ethers.encodeBytes32String(`sell-${i}-${Date.now()}`);
 
-    const data = contract.interface.encodeFunctionData("createSellIntent", [
-      sellAmount,
-      minBuyAmount,
+    console.log(`Submitting SellIntent #${i}: sell ${sellETH} ETH for min ${minBTC} BTC`);
+    const tx = await mmContract.createSellIntent(
+      sellAmountETH,
+      minBuyAmountBTC,
       deadline,
       offchainId
-    ]);
-
-    const ownerSigner = signerMap[owners[0].toLowerCase()];
-    if (!ownerSigner) {
-      console.error(`No signer found for owner ${owners[0]}`);
-      return;
-    }
-
-    const tx = await multisig
-      .connect(ownerSigner)
-      .submitTransaction(intentMatchingAddress, 0, data);
-
+    );
     const receipt = await tx.wait();
 
-    const parsed = receipt.logs
-      .map((log) => {
-        try {
-          return multisig.interface.parseLog(log);
-        } catch {
-          return null;
+    let printed = false;
+    for (const log of receipt.logs || []) {
+      try {
+        const parsed = mmContract.interface.parseLog({ topics: log.topics, data: log.data });
+        if (parsed.name === "SellIntentCreated") {
+          const { intentId, seller, sellAmount, minBuyAmount, deadline: dl, offchainId: ofc } = parsed.args;
+          console.log(`SellIntentCreated:
+  - id:          ${intentId}
+  - seller:      ${seller}
+  - sellAmount:  ${hre.ethers.formatEther(sellAmount)} ETH
+  - minBuyAmount:${hre.ethers.formatUnits(minBuyAmount, 8)} BTC
+  - deadline:    ${dl}
+  - offchainId:  ${ofc}`);
+          printed = true;
         }
-      })
-      .find((e) => e?.name === "TransactionSubmitted");
-
-    if (parsed) {
-      console.log(`SellIntent ${i} submitted via multisig. TxID: ${parsed.args.txID}`);
-    } else {
-      console.log(`SellIntent ${i} submitted, but event not parsed.`);
+      } catch {}
     }
+    if (!printed) console.log(`SellIntent #${i} tx hash: ${receipt.hash}`);
   }
 
-  console.log("All SellIntents submitted via multisig. Use confirm script to proceed.");
+  console.log("All SellIntents created directly by Market Maker EOA.");
 }
 
 main().catch((err) => {

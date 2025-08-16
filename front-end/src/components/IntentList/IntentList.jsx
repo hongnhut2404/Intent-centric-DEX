@@ -12,7 +12,6 @@ export default function IntentList() {
   const [sellIntents, setSellIntents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [netInfo, setNetInfo] = useState('');
   const contractRef = useRef(null);
 
   const formatStatus = (statusEnum) => {
@@ -38,7 +37,6 @@ export default function IntentList() {
       setLoading(true);
 
       const net = await provider.getNetwork();
-      setNetInfo(`chainId=${net.chainId.toString()}`);
 
       const code = await provider.getCode(intentAddress.address);
       if (code === '0x') {
@@ -108,7 +106,6 @@ export default function IntentList() {
     <div className="intent-list">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         <button onClick={loadIntents} className="dex-swap-button">Refresh</button>
-        {netInfo && <span style={{ color: '#9ca3af' }}>{netInfo}</span>}
         {loading && <span style={{ color: '#9ca3af' }}>Loading…</span>}
         {err && <span style={{ color: '#ef4444' }}>{err}</span>}
       </div>

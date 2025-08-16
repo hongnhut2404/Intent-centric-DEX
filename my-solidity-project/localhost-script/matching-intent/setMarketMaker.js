@@ -3,7 +3,7 @@ const hre = require("hardhat");
 const fs = require("fs");
 
 async function main() {
-  const [owner, mmSigner] = await hre.ethers.getSigners(); // owner = #0, mmSigner = #1
+  const [owner] = await hre.ethers.getSigners();
 
   const { address } = JSON.parse(
     fs.readFileSync("data/intent-matching-address.json", "utf8")
@@ -12,13 +12,10 @@ async function main() {
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
   const contract = IntentMatching.attach(address);
 
-  const tx = await contract.connect(owner).setMarketMaker(mmSigner.address);
+  
+  const tx = await contract.connect(owner).setMarketMaker(mm);
   await tx.wait();
-
-  console.log("marketMaker set to:", mmSigner.address);
+  console.log("marketMaker set to:", mm);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch((e) => { console.error(e); process.exit(1); });

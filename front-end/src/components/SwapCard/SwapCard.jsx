@@ -1,12 +1,14 @@
-// src/components/SwapCard/SwapCard.jsx
 import './SwapCard.css';
 import { useState, useMemo } from 'react';
 import { ethers } from 'ethers';
 import { useLocalSigners } from '../../web3/LocalSignerContext';
 import { intentMatchingWith } from '../../web3/contract';
 
-export default function SwapCard() {
-  const { userSigner } = useLocalSigners();
+export default function SwapCard({ role = 'user' }) {
+  const isBuy = role !== 'mm';
+
+  const { userSigner, mmSigner } = useLocalSigners();
+  const signer = isBuy ? userSigner : mmSigner;
 
   const [btcAmount, setBtcAmount] = useState('');
   const [ethAmount, setEthAmount] = useState('');
@@ -16,16 +18,16 @@ export default function SwapCard() {
   const rate = useMemo(() => {
     const b = parseFloat(btcAmount);
     const e = parseFloat(ethAmount);
-    if (!isFinite(b) || !isFinite(e) || b <= 0) return null;
-    return (e / b).toFixed(6);
-  }, [btcAmount, ethAmount]);
+    if (!isFinite(b) || !isFinite(e) || b <= 0 || e <= 0) return null;
+    return isBuy ? (e / b).toFixed(6)    // ETH/BTC
+                 : (b / e).toFixed(8);   // BTC/ETH
+  }, [btcAmount, ethAmount, isBuy]);
 
-  const onChangeNum = (setter, name) => (e) => {
+  const onChangeNum = (setter) => (e) => {
     const v = e.target.value.trim();
     if (v === '') return setter('');
     const num = Number(v);
-    if (!isFinite(num) || num < 0) return; // ignore invalid
-    // small clamp to avoid scientific notation issues
+    if (!isFinite(num) || num < 0) return;
     setter(v);
   };
 
@@ -33,34 +35,59 @@ export default function SwapCard() {
     setLoading(true);
     setResponseMsg('');
     try {
-      if (!btcAmount || !ethAmount) throw new Error('Enter BTC and ETH amounts');
+      if (!signer) throw new Error('No signer available for this role');
+      if (!btcAmount || !ethAmount) throw new Error('Please enter both BTC and ETH amounts');
 
-      const contract = intentMatchingWith(userSigner);
-
-      const btcAmountParsed = ethers.parseUnits(btcAmount, 8); // BTC (off-chain units)
-      const ethAmountParsed = ethers.parseEther(ethAmount);    // ETH (wei)
-      const locktime = Math.floor(Date.now() / 1000) + 3600;   // +1 hour
+      const contract = intentMatchingWith(signer);
       const offchainId = ethers.id(`offchain-${Date.now()}`);
-      const slippageValue = 0; // contract expects a param; we pass 0
 
-      const tx = await contract.createBuyIntent(
-        btcAmountParsed,
-        ethAmountParsed,
-        locktime,
-        offchainId,
-        slippageValue
-      );
-      await tx.wait();
+      if (isBuy) {
+        const btcAmountParsed = ethers.parseUnits(btcAmount, 8);
+        const ethAmountParsed = ethers.parseEther(ethAmount);
+        const locktime = Math.floor(Date.now() / 1000) + 3600;
+        const slippageValue = 0;
 
-      setResponseMsg(
-        `Buy Intent created! ${btcAmount} BTC for ${ethAmount} ETH (rate ${rate ?? '—'} ETH/BTC).`
-      );
-      // Optional: clear inputs
-      // setBtcAmount('');
-      // setEthAmount('');
+        const tx = await contract.createBuyIntent(
+          btcAmountParsed,
+          ethAmountParsed,
+          locktime,
+          offchainId,
+          slippageValue
+        );
+        await tx.wait();
+
+        setResponseMsg(
+          `✅ Buy Intent created! ${btcAmount} BTC ↔ ${ethAmount} ETH` +
+          (rate ? ` (rate ${rate} ETH/BTC)` : '') + `.`
+        );
+      } else {
+        // SELL (MM)
+        const sellAmountETH = ethers.parseEther(ethAmount);
+        const minBuyAmountBTC = ethers.parseUnits(btcAmount, 8);
+        const deadline = Math.floor(Date.now() / 1000) + 3600;
+
+        // Optional debug: only if ABI supports it
+        if (typeof contract.marketMaker === 'function') {
+          const mm = await contract.marketMaker();
+          console.log('marketMaker() on-chain:', mm);
+        }
+
+        const tx = await contract.createSellIntent(
+          sellAmountETH,
+          minBuyAmountBTC,
+          deadline,
+          offchainId
+        );
+        await tx.wait();
+
+        setResponseMsg(
+          `✅ Sell Intent created! Sell ${ethAmount} ETH for min ${btcAmount} BTC` +
+          (rate ? ` (≈ ${rate} BTC/ETH)` : '') + `.`
+        );
+      }
     } catch (err) {
       console.error(err);
-      setResponseMsg(`Failed to create Buy Intent: ${err.reason || err.message || err}`);
+      setResponseMsg(`❌ Failed: ${err.reason || err.message || String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -68,19 +95,23 @@ export default function SwapCard() {
 
   const disabled = loading || !btcAmount || !ethAmount;
 
+  const btcLabel = isBuy ? 'Amount of BTC' : 'Min BTC Expected';
+  const ethLabel = isBuy ? 'Amount of ETH' : 'Sell Amount (ETH)';
+  const title = isBuy ? 'Create Buy Intent' : 'Create Sell Intent';
+  const rateUnit = isBuy ? 'ETH/BTC' : 'BTC/ETH';
+
   return (
     <div className="dex-swap-card">
-      <h2 className="dex-section-title">Create Buy Intent</h2>
+      <h2 className="dex-section-title">{title}</h2>
 
       <div className="dex-token-input">
-        <label>Amount of BTC</label>
+        <label>{btcLabel}</label>
         <input
-          name="btc"
           type="number"
           min="0"
-          step="0.01"
+          step="0.00000001"
           value={btcAmount}
-          onChange={onChangeNum(setBtcAmount, 'btc')}
+          onChange={onChangeNum(setBtcAmount)}
           placeholder="0.0"
           className="dex-token-amount"
           inputMode="decimal"
@@ -88,14 +119,13 @@ export default function SwapCard() {
       </div>
 
       <div className="dex-token-input">
-        <label>Amount of ETH</label>
+        <label>{ethLabel}</label>
         <input
-          name="eth"
           type="number"
           min="0"
-          step="0.01"
+          step="0.0001"
           value={ethAmount}
-          onChange={onChangeNum(setEthAmount, 'eth')}
+          onChange={onChangeNum(setEthAmount)}
           placeholder="0.0"
           className="dex-token-amount"
           inputMode="decimal"
@@ -104,16 +134,12 @@ export default function SwapCard() {
 
       {rate && (
         <div className="dex-rate-info">
-          Calculated Rate:&nbsp;<strong>{rate}</strong>&nbsp;ETH/BTC
+          Rate: <strong>{rate}</strong> {rateUnit}
         </div>
       )}
 
-      <button
-        className="dex-swap-button"
-        onClick={handleCreateIntent}
-        disabled={disabled}
-      >
-        {loading ? 'Creating…' : 'Create Buy Intent'}
+      <button className="dex-swap-button" onClick={handleCreateIntent} disabled={disabled}>
+        {loading ? 'Creating…' : `Create ${isBuy ? 'Buy' : 'Sell'} Intent`}
       </button>
 
       {responseMsg && <p className="dex-response-msg">{responseMsg}</p>}
