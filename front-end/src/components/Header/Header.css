@@ -32,17 +32,56 @@
   color: #6c6a6a;
   text-decoration: none;
   font-weight: 500;
-  padding: 0.5rem;
-  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
 }
 
 .dex-nav-link:hover {
   color: #df7758;
-  background-color: #553b3b;
+  background-color: rgba(85, 59, 59, 0.5);
+  transform: translateY(-1px);
 }
 
 .dex-nav-link.active {
   color: #df7758;
+  background-color: rgba(223, 119, 88, 0.1);
+  border: 1px solid rgba(223, 119, 88, 0.3);
+}
+
+.tab-icon {
+  font-size: 1rem;
+}
+
+.tab-label {
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .dex-nav {
+    gap: 0.5rem;
+  }
+  
+  .dex-nav-link {
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .tab-label {
+    font-size: 0.75rem;
+  }
+  
+  .tab-icon {
+    font-size: 0.875rem;
+  }
 }
 
 .dex-header-actions {

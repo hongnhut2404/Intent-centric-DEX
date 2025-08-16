@@ -8,7 +8,12 @@ export default function Header({
   setActiveTab,
   onConnectClick,        // NEW: handler from App to open the role picker
 }) {
-  const tabs = ['Swap', 'Intents', 'Matches'];
+  const tabs = [
+    { id: 'Swap', label: 'Create Intent', icon: '💱' },
+    { id: 'Intents', label: 'Open Intents', icon: '📋' },
+    { id: 'Matches', label: 'Matched Intents', icon: '✅' },
+    { id: 'HTLC', label: 'HTLC Status', icon: '🔒' }
+  ];
 
   const handleConnect = () => {
     if (typeof onConnectClick === 'function') {
@@ -26,12 +31,14 @@ export default function Header({
       <nav className="dex-nav" aria-label="Main">
         {tabs.map((tab) => (
           <button
-            key={tab}
+            key={tab.id}
             type="button"
-            className={`dex-nav-link ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
+            className={`dex-nav-link ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+            title={tab.label}
           >
-            {tab}
+            <span className="tab-icon">{tab.icon}</span>
+            <span className="tab-label">{tab.label}</span>
           </button>
         ))}
       </nav>
