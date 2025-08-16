@@ -122,3 +122,33 @@
 .dex-switch-button:hover {
   background: #374151;
 }
+
+/* ===== ETH Sub-Navigation Buttons ===== */
+.dex-nav-link {
+  background: #1f2937;             /* dark gray bg */
+  color: #e5e7eb;                  /* light text */
+  font-weight: 500;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.dex-nav-link:hover {
+  background: #2d3748;             /* slightly lighter bg */
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.dex-nav-link:active {
+  background: #374151;
+  transform: translateY(0);
+}
+
+.dex-nav-link.active {
+  background: #df7758;             /* primary highlight */
+  color: #fff;
+  border-color: #df7758;
+  font-weight: 600;
+}

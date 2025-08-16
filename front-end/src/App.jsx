@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Header from './components/Header/Header';
 import SwapCard from './components/SwapCard/SwapCard';
 import IntentList from './components/IntentList/IntentList';
+import MatchedList from './components/MatchedList/MatchedList';
+import HtlcPanel from './components/HtlcPanel/HtlcPanel';
 import Footer from './components/Footer/Footer';
 import ChatIcon from './components/ChatIcon/ChatIcon';
 import RoleSelectModal from './components/RoleSelect/RoleSelectModal'; // ETH modal
@@ -51,6 +53,8 @@ export default function App() {
     if (chain === 'eth') {
       if (activeTab === 'Swap') return <SwapCard role={ethRole === 'MM' ? 'mm' : 'user'} />;
       if (activeTab === 'Intents') return <IntentList />;
+      if (activeTab === 'Matches') return <MatchedList />;
+      if (activeTab === 'HTLC') return <HtlcPanel />;
       return <div style={{ color: 'white', padding: '2rem' }}>Coming Soon…</div>;
     }
     // Bitcoin page
