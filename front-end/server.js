@@ -81,6 +81,26 @@ app.get('/api/htlc/view', async (_req, res) => {
   }
 });
 
+// POST /api/htlc/withdraw
+app.post('/api/htlc/withdraw', async (req, res) => {
+  try {
+    const { buyId } = req.body ?? {};
+    const env = { ...process.env };
+    if (buyId !== undefined && buyId !== null) env.BUY_ID = String(buyId);
+
+    const { out, err } = await runNode(
+      'npx',
+      ['hardhat', 'run', 'localhost-script/htlc/withdrawHTLC.js', '--network', 'localhost'],
+      { env }
+    );
+
+    res.json({ ok: true, out, err });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
+  }
+});
+
+
 // Optional: 404 for unknown /api routes
 app.use('/api', (_req, res) => {
   res.status(404).json({ ok: false, error: 'Not found' });
