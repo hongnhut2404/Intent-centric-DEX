@@ -80,3 +80,45 @@
   width: 24px;
   height: 24px;
 }
+
+.chain-switch {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 8px;
+  align-items: center;
+  margin: 0 16px;
+}
+
+.chain-pill {
+  background: #1f2937;
+  border: 1px solid #334155;
+  color: #e5e7eb;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .15s ease, border-color .15s ease, transform .05s ease;
+}
+.chain-pill:hover { background:#0b1220; border-color:#475569; transform: translateY(-1px); }
+.chain-pill.active { background:#ef8354; border-color:#ef8354; color:#0b1220; }
+
+.dex-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.dex-switch-button {
+  background: #1f2937;
+  color: #e5e7eb;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+}
+
+.dex-switch-button:hover {
+  background: #374151;
+}

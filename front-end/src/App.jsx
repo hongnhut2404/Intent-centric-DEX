@@ -1,60 +1,60 @@
-// src/App.jsx
 import { useState } from 'react';
 import Header from './components/Header/Header';
 import SwapCard from './components/SwapCard/SwapCard';
 import IntentList from './components/IntentList/IntentList';
-import HtlcPanel from './components/HtlcPanel/HtlcPanel';
 import Footer from './components/Footer/Footer';
 import ChatIcon from './components/ChatIcon/ChatIcon';
-import RoleSelectModal from './components/RoleSelect/RoleSelectModal';
+import RoleSelectModal from './components/RoleSelect/RoleSelectModal'; // ETH modal
+import BitcoinConnectModal from './components/BitcoinConnect/BitcoinConnectModal'; // BTC modal
+import BitcoinPanel from './components/BitcoinPanel/BitcoinPanel';
 import { useLocalSigners } from './web3/LocalSignerContext';
 import './App.css';
 
 export default function App() {
-  // connection + role
   const [connected, setConnected] = useState(false);
-  const [role, setRole] = useState(null); // 'User' | 'MM'
 
-  // UI nav
-  const [activeTab, setActiveTab] = useState('Swap'); // 'Swap' | 'Intents' | 'HTLC'
+  // 'eth' | 'btc'
+  const [chain, setChain] = useState('eth');
+
+  // ETH-only
+  const [activeTab, setActiveTab] = useState('Swap'); // 'Swap' | 'Intents' | ...
+  const [ethRole, setEthRole] = useState(null);       // 'User' | 'MM'
   const [showRolePicker, setShowRolePicker] = useState(false);
+
+  // BTC-only
+  const [btcIdentity, setBtcIdentity] = useState(null); // { who: 'alice'|'bob', address }
+  const [showBtcPicker, setShowBtcPicker] = useState(false);
 
   const { userAddress, mmAddress } = useLocalSigners();
   const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
 
-  const handleConnectClick = () => setShowRolePicker(true);
+  // Connect flow
+  const handleConnectClick = () => {
+    if (chain === 'eth') setShowRolePicker(true);
+    else setShowBtcPicker(true);
+  };
 
-  const handlePickRole = (picked) => {
-    // picked is 'User' or 'MM'
-    setRole(picked);
+  const handlePickEthRole = (picked) => {
+    setEthRole(picked);
     setConnected(true);
     setShowRolePicker(false);
-    setActiveTab('Swap'); // stay on Swap; SwapCard flips behavior based on role
+    setActiveTab('Swap');
+  };
+
+  const handlePickBtc = (payload) => {
+    setBtcIdentity({ who: payload.who, address: payload.address });
+    setConnected(true);
+    setShowBtcPicker(false);
   };
 
   const renderMain = () => {
-    if (!connected) {
-      return (
-        <div style={{ color: 'white', padding: '2rem' }}>
-          <p style={{ marginBottom: 12 }}>Click <strong>Connect</strong> to choose a role.</p>
-          <button onClick={handleConnectClick} className="dex-swap-button">Connect</button>
-        </div>
-      );
+    if (chain === 'eth') {
+      if (activeTab === 'Swap') return <SwapCard role={ethRole === 'MM' ? 'mm' : 'user'} />;
+      if (activeTab === 'Intents') return <IntentList />;
+      return <div style={{ color: 'white', padding: '2rem' }}>Coming Soon…</div>;
     }
-
-    switch (activeTab) {
-      case 'Swap':
-        return <SwapCard role={role === 'MM' ? 'mm' : 'user'} />;
-
-      case 'Intents':
-        return <IntentList />;
-
-      case 'HTLC':
-        return <HtlcPanel />;
-
-      default:
-        return <div style={{ color: 'white', padding: '2rem' }}>Coming Soon…</div>;
-    }
+    // Bitcoin page
+    return <BitcoinPanel btcIdentity={btcIdentity} />;
   };
 
   return (
@@ -62,12 +62,14 @@ export default function App() {
       <Header
         connected={connected}
         setConnected={setConnected}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onConnectClick={handleConnectClick} // opens role chooser
+        activeTab={chain === 'eth' ? activeTab : undefined}
+        setActiveTab={chain === 'eth' ? setActiveTab : () => {}}
+        onConnectClick={handleConnectClick}
+        chain={chain}
+        setChain={setChain}
       />
 
-      {/* Status banner */}
+      {/* Status bar below header */}
       <div
         style={{
           background: '#111826',
@@ -76,26 +78,41 @@ export default function App() {
           display: 'flex',
           gap: '16px',
           alignItems: 'center',
-          borderBottom: '1px solid #1f2937'
+          borderBottom: '1px solid #1f2937',
         }}
       >
-        <span><strong>Role:</strong> {role ?? '—'}</span>
-        <span><strong>User:</strong> {short(userAddress)}</span>
-        <span><strong>MM:</strong> {short(mmAddress)}</span>
+        {chain === 'eth' ? (
+          <>
+            <span><strong>Role:</strong> {ethRole ?? '—'}</span>
+            <span><strong>User:</strong> {short(userAddress)}</span>
+            <span><strong>MM:</strong> {short(mmAddress)}</span>
+          </>
+        ) : (
+          <>
+            <span><strong>BTC Who:</strong> {btcIdentity?.who ?? '—'}</span>
+            <span><strong>BTC Addr:</strong> {btcIdentity ? short(btcIdentity.address) : '—'}</span>
+          </>
+        )}
         <span style={{ opacity: 0.8 }}>Local RPC: 127.0.0.1:8545</span>
       </div>
 
       <main className="dex-main">{renderMain()}</main>
-
       <Footer />
       <ChatIcon />
 
-      {showRolePicker && (
+      {showRolePicker && chain === 'eth' && (
         <RoleSelectModal
           userAddress={userAddress}
           mmAddress={mmAddress}
           onClose={() => setShowRolePicker(false)}
-          onPick={handlePickRole}
+          onPick={handlePickEthRole}
+        />
+      )}
+
+      {showBtcPicker && chain === 'btc' && (
+        <BitcoinConnectModal
+          onClose={() => setShowBtcPicker(false)}
+          onPick={handlePickBtc}
         />
       )}
     </div>
