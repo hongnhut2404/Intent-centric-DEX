@@ -1,0 +1,35 @@
+echo "Deploying IntentMatching contract..."
+npx hardhat run localhost-script/matching-intent/deployIntentMatching.js --network localhost
+
+echo "Deploying MultisigWallet contract..."
+npx hardhat run localhost-script/matching-intent/deployMultisigWallet.js --network localhost
+
+echo "Creating BuyIntent..."
+npx hardhat run localhost-script/matching-intent/createBuyIntent.js --network localhost
+
+echo "Creating SellIntent..."
+npx hardhat run localhost-script/matching-intent/createSellIntent.js --network localhost
+
+echo "Confirming SellIntent..."
+npx hardhat run localhost-script/matching-intent/confirmSellIntent.js --network localhost
+
+echo "Viewing all Buy and Sell intents..."
+npx hardhat run localhost-script/matching-intent/viewAllIntents.js --network localhost
+
+echo "Matching BuyIntent with ID = 0..."
+BUY_ID=0 npx hardhat run localhost-script/matching-intent/matchingIntentComponent.js --network localhost
+
+echo "Confirming multisig transaction"
+npx hardhat run localhost-script/matching-intent/confirmMultisigTx.js --network localhost
+
+echo "Deploying HTLC contract..."
+npx hardhat run localhost-script/htlc/deployHTLC.js --network localhost
+
+echo "Funding HTLC contract..."
+npx hardhat run localhost-script/htlc/fund.js --network localhost
+
+echo "Creating HTLCs for matched trades..."
+npx hardhat run localhost-script/htlc/createHTLC.js --network localhost
+
+echo "Viewing all HTLCs..."
+npx hardhat run localhost-script/htlc/viewHTLC.js --network localhost

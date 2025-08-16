@@ -1,7 +1,0 @@
-Payment channel
-- Used only on Bitcoin chain 
-
-Exchange data will execute using the transaction on both chain (not json)
-
-Thesis paper
-1. Introduction

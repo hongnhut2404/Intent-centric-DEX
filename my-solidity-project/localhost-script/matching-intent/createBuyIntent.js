@@ -16,7 +16,7 @@ async function main() {
   const offchainId = ethers.encodeBytes32String("buy-eth");
 
   const buyIntents = [
-    { amountBTC: 8.0, minBuyETH: "4.0", slippagePercent: 10 }
+    { amountBTC: 8.0, minBuyETH: "40.0", slippagePercent: 0 }
   ];
 
   for (const { amountBTC, minBuyETH, slippagePercent } of buyIntents) {
