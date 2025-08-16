@@ -7,7 +7,6 @@ import intentAddress from '../../contracts/intent-matching-address.json';
 export default function SwapCard() {
   const [btcAmount, setBtcAmount] = useState('');
   const [ethAmount, setEthAmount] = useState('');
-  const [slippage, setSlippage] = useState('');
   const [rate, setRate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [responseMsg, setResponseMsg] = useState('');
@@ -21,7 +20,7 @@ export default function SwapCard() {
 
   const handleInputChange = (setter) => (e) => {
     const value = e.target.value;
-    if (value === '' || isNaN(value) || parseFloat(value) < 0) {
+    if (value === '' || isNaN(Number(value)) || parseFloat(value) < 0) {
       setter('');
       setRate(null);
       return;
@@ -54,23 +53,31 @@ export default function SwapCard() {
       );
 
       const btcAmountParsed = ethers.parseUnits(btcAmount, 8); // BTC: 8 decimals (off-chain)
-      const ethAmountParsed = ethers.parseEther(ethAmount);     // ETH: 18 decimals
-      const locktime = Math.floor(Date.now() / 1000) + 3600;     // 1 hour later
-      const slippageValue = parseInt(slippage || '0');
+      const ethAmountParsed = ethers.parseEther(ethAmount);    // ETH: 18 decimals
+      const locktime = Math.floor(Date.now() / 1000) + 3600;   // 1 hour later
       const offchainId = ethers.id(`offchain-${Date.now()}`);
+
+      // If your Solidity function still expects a slippage param, pass 0.
+      // If it no longer exists, remove the last argument and this variable.
+      const slippageValue = 0;
 
       const tx = await contract.createBuyIntent(
         btcAmountParsed,
         ethAmountParsed,
         locktime,
         offchainId,
-        slippageValue
+        slippageValue // remove this if your contract no longer has slippage
       );
+
+      // If your contract signature is now (btc, eth, locktime, offchainId) only, use:
+      // const tx = await contract.createBuyIntent(
+      //   btcAmountParsed, ethAmountParsed, locktime, offchainId
+      // );
 
       await tx.wait();
 
       setResponseMsg(
-        `Buy Intent created successfully! Rate: ${rate} ETH/BTC with ${slippage || 0}% slippage.`
+        `Buy Intent created successfully! Rate: ${rate ?? '—'} ETH/BTC.`
       );
     } catch (err) {
       console.error(err);
@@ -110,18 +117,6 @@ export default function SwapCard() {
         />
       </div>
 
-      <div className="dex-token-input">
-        <label>Slippage (%)</label>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={slippage}
-          onChange={(e) => setSlippage(e.target.value)}
-          className="dex-token-amount"
-        />
-      </div>
-
       {rate && (
         <div className="dex-rate-info">
           Calculated Rate: <strong>{rate}</strong> ETH/BTC
@@ -136,9 +131,7 @@ export default function SwapCard() {
         {loading ? 'Creating...' : 'Create Buy Intent'}
       </button>
 
-      {responseMsg && (
-        <p className="dex-response-msg">{responseMsg}</p>
-      )}
+      {responseMsg && <p className="dex-response-msg">{responseMsg}</p>}
     </div>
   );
 }
