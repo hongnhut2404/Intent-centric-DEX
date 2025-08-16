@@ -3,8 +3,6 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "hardhat/console.sol";
 
 contract IntentMatching is Ownable, ReentrancyGuard {
     enum IntentStatus {
@@ -18,8 +16,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct BuyIntent {
         address buyer;
-        uint256 sellAmount;     // BTC amount (off-chain)
-        uint256 minBuyAmount;   // ETH expected (on-chain)
+        uint256 sellAmount;     // BTC amount (off-chain units, e.g. satoshis)
+        uint256 minBuyAmount;   // ETH expected (on-chain, wei)
         uint256 locktime;
         uint256 createdAt;
         IntentStatus status;
@@ -29,8 +27,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct SellIntent {
         address seller;         // market maker EOA
-        uint256 sellAmount;     // ETH amount
-        uint256 minBuyAmount;   // BTC expected
+        uint256 sellAmount;     // ETH amount (wei)
+        uint256 minBuyAmount;   // BTC expected (sats)
         uint256 deadline;
         IntentStatus status;
         bytes32 offchainId;
@@ -38,7 +36,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
     struct RateEntry {
         uint256 index;
-        uint256 rate;
+        uint256 rate;           // ETH per BTC scaled by 1e18
     }
 
     struct MatchedTrade {
@@ -46,8 +44,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         uint256 sellIntentId;
         address executor;
         address recipient;
-        uint256 ethAmount;
-        uint256 btcAmount;
+        uint256 ethAmount;      // wei
+        uint256 btcAmount;      // sats
         uint256 locktime;
         uint256 timestamp;
     }
@@ -61,11 +59,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
     mapping(uint256 => SellIntent) public sellIntents;
 
     // ROLES
-    address public marketMaker;     // <-- NEW: EOA allowed to post Sell Intents
-    address public multisigWallet;  // Solver multisig (used for HTLC ops)
+    address public marketMaker;     // EOA allowed to create sell intents
+    address public multisigWallet;  // solver multisig (for HTLC ops)
     address public htlcAddress;
 
-    // Modifiers
+    // --- Modifiers ---
     modifier onlyMultisig() {
         require(msg.sender == multisigWallet, "Only multisig wallet can call");
         _;
@@ -76,7 +74,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         _;
     }
 
-    // Events
+    // --- Events ---
     event BuyIntentCreated(
         uint256 indexed intentId,
         address indexed buyer,
@@ -103,7 +101,8 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         address buyer,
         uint256 ethAmount,
         uint256 btcAmount,
-        uint256 locktime
+        uint256 locktime,
+        uint256 timestamp
     );
 
     event HTLCPrepared(
@@ -123,11 +122,11 @@ contract IntentMatching is Ownable, ReentrancyGuard {
     );
 
     event NoMatchingSellIntent(uint256 indexed buyIntentId);
-    event MarketMakerUpdated(address oldAddress, address newAddress);     // <-- NEW
+    event MarketMakerUpdated(address oldAddress, address newAddress);
     event MultisigWalletUpdated(address oldWallet, address newWallet);
     event HTLCAddressUpdated(address oldAddress, address newAddress);
 
-    // Setters
+    // --- Setters ---
     function setMarketMaker(address _mm) external onlyOwner {
         require(_mm != address(0), "Invalid marketMaker");
         emit MarketMakerUpdated(marketMaker, _mm);
@@ -147,10 +146,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         htlcAddress = _htlc;
     }
 
-    // Create Buy Intent (open to public)
+    // --- Create intents ---
     function createBuyIntent(
-        uint256 sellAmount,
-        uint256 minBuyAmount,
+        uint256 sellAmount,     // BTC (sats)
+        uint256 minBuyAmount,   // ETH (wei)
         uint256 locktime,
         bytes32 offchainId,
         uint256 slippage
@@ -171,21 +170,13 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             slippage: slippage
         });
 
-        emit BuyIntentCreated(
-            id,
-            msg.sender,
-            sellAmount,
-            minBuyAmount,
-            locktime,
-            offchainId
-        );
+        emit BuyIntentCreated(id, msg.sender, sellAmount, minBuyAmount, locktime, offchainId);
         return id;
     }
 
-    // Create Sell Intent (by Market Maker EOA)
     function createSellIntent(
-        uint256 sellAmount,
-        uint256 minBuyAmount,
+        uint256 sellAmount,     // ETH (wei)
+        uint256 minBuyAmount,   // BTC (sats)
         uint256 deadline,
         bytes32 offchainId
     ) external onlyMarketMaker returns (uint256) {
@@ -202,29 +193,22 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             offchainId: offchainId
         });
 
-        emit SellIntentCreated(
-            id,
-            msg.sender,
-            sellAmount,
-            minBuyAmount,
-            deadline,
-            offchainId
-        );
+        emit SellIntentCreated(id, msg.sender, sellAmount, minBuyAmount, deadline, offchainId);
         return id;
     }
 
-    // Match logic (unchanged)
+    // --- Matching (supports partial fills across multiple sell intents) ---
     function matchIntent(uint256 buyIntentId) external nonReentrant {
         BuyIntent storage buy = buyIntents[buyIntentId];
         require(buy.status == IntentStatus.Pending, "BuyIntent not pending");
         require(block.timestamp <= buy.locktime, "BuyIntent expired");
 
-        uint256 remainingBTC = buy.sellAmount;
+        // expectedRate = ETH/BTC (scaled by 1e18)
         uint256 expectedRate = (buy.minBuyAmount * 1e18) / buy.sellAmount;
-
         uint256 lowerBoundRate = (expectedRate * (100 - buy.slippage)) / 100;
         uint256 upperBoundRate = expectedRate;
 
+        // Collect candidate sell intents that satisfy the buyer's slippage bounds
         RateEntry[] memory candidates = new RateEntry[](intentCountSell);
         uint256 count = 0;
 
@@ -232,7 +216,10 @@ contract IntentMatching is Ownable, ReentrancyGuard {
             SellIntent storage sell = sellIntents[i];
             if (sell.status != IntentStatus.Pending || block.timestamp > sell.deadline) continue;
 
-            uint256 sellRate = (sell.minBuyAmount * 1e18) / sell.sellAmount;
+            // sellRate = ETH/BTC (scaled by 1e18) from seller's quoted amounts
+            // ETH per BTC = sell.sellAmount / sell.minBuyAmount
+            uint256 sellRate = (sell.sellAmount * 1e18) / sell.minBuyAmount;
+
             if (sellRate >= lowerBoundRate && sellRate <= upperBoundRate) {
                 candidates[count++] = RateEntry(i, sellRate);
             }
@@ -240,25 +227,33 @@ contract IntentMatching is Ownable, ReentrancyGuard {
 
         require(count > 0, "No matching sell intents found");
 
-        // sort by highest rate (desc)
+        // Sort candidates by highest rate (least favorable to buyer within tolerance)
         for (uint256 i = 0; i < count; i++) {
             for (uint256 j = i + 1; j < count; j++) {
                 if (candidates[j].rate > candidates[i].rate) {
-                    RateEntry memory temp = candidates[i];
+                    RateEntry memory tmp = candidates[i];
                     candidates[i] = candidates[j];
-                    candidates[j] = temp;
+                    candidates[j] = tmp;
                 }
             }
         }
 
-        uint256 totalETHPaid = 0;
+        uint256 remainingBTC = buy.sellAmount; // sats
+        uint256 totalETHPaid = 0;              // wei
 
         for (uint256 i = 0; i < count && remainingBTC > 0; i++) {
             SellIntent storage sell = sellIntents[candidates[i].index];
 
-            uint256 matchedBTC = sell.sellAmount > remainingBTC ? remainingBTC : sell.sellAmount;
-            uint256 matchedETH = (sell.minBuyAmount * matchedBTC) / sell.sellAmount;
+            // Seller capacity in BTC (sats)
+            uint256 sellerCapBTC = sell.minBuyAmount;
 
+            // BTC we can match (sats)
+            uint256 matchedBTC = remainingBTC < sellerCapBTC ? remainingBTC : sellerCapBTC;
+
+            // ETH (wei) for that BTC using ETH/BTC ratio: sellETH / sellBTC
+            uint256 matchedETH = (sell.sellAmount * matchedBTC) / sell.minBuyAmount;
+
+            // Record trade
             matchedTrades[matchedTradeCount++] = MatchedTrade({
                 buyIntentId: buyIntentId,
                 sellIntentId: candidates[i].index,
@@ -278,30 +273,35 @@ contract IntentMatching is Ownable, ReentrancyGuard {
                 buy.buyer,
                 matchedETH,
                 matchedBTC,
-                buy.locktime
+                buy.locktime,
+                block.timestamp
             );
 
-            if (matchedBTC == sell.sellAmount) {
+            // Update seller (partial or filled), preserving units
+            if (matchedBTC == sell.minBuyAmount) {
                 sell.status = IntentStatus.Filled;
+                sell.minBuyAmount = 0; // BTC remaining
+                sell.sellAmount   = 0; // ETH remaining
             } else {
-                sell.sellAmount -= matchedBTC;
-                sell.minBuyAmount -= matchedETH;
+                sell.minBuyAmount -= matchedBTC; // BTC (sats)
+                sell.sellAmount   -= matchedETH; // ETH (wei)
             }
 
-            remainingBTC -= matchedBTC;
-            totalETHPaid += matchedETH;
+            remainingBTC -= matchedBTC;   // sats
+            totalETHPaid += matchedETH;   // wei
         }
 
+        // Update buyer
         if (remainingBTC == 0) {
             buy.status = IntentStatus.Filled;
         } else if (remainingBTC < buy.sellAmount) {
             buy.status = IntentStatus.Partial;
-            buy.sellAmount = remainingBTC;
-            buy.minBuyAmount -= totalETHPaid;
+            buy.sellAmount   = remainingBTC;   // sats still to fill
+            buy.minBuyAmount -= totalETHPaid;  // wei still expected
         }
     }
 
-    // Solver multisig-only
+    // --- HTLC (solver multisig only) ---
     function associateHTLC(
         uint256 buyIntentId,
         bytes32 lockId,
@@ -311,7 +311,7 @@ contract IntentMatching is Ownable, ReentrancyGuard {
         emit HTLCAssociated(buyIntentId, lockId, recipient, secretHash);
     }
 
-    // Getters
+    // --- Getters ---
     function getBuyIntent(uint256 id) external view returns (BuyIntent memory) {
         return buyIntents[id];
     }
