@@ -1,81 +1,26 @@
-/* Panel container */
 .htlc-panel {
   background: #0f172a;
   color: #e5e7eb;
   border: 1px solid #1f2937;
   border-radius: 16px;
   padding: 16px;
-  max-width: 980px;
+  max-width: 920px;
   width: 100%;
 }
 
-/* 4-button toolbar in a row, wraps on small screens */
-.htlc-toolbar {
+.htlc-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
   gap: 12px;
-  margin-bottom: 14px;
-}
-
-@media (max-width: 640px) {
-  .htlc-toolbar {
-    grid-template-columns: repeat(2, minmax(120px, 1fr));
-  }
-}
-
-/* Modal */
-.htlc-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.55);
-  display: grid;
-  place-items: center;
-  z-index: 70;
-}
-
-.htlc-modal {
-  width: min(520px, 92vw);
-  background: #0b1220;
-  border: 1px solid #223047;
-  border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.45);
-  padding: 16px;
-}
-
-.htlc-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.htlc-close {
-  background: #1f2937;
-  border: 1px solid #334155;
-  color: #e5e7eb;
-  border-radius: 10px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-.htlc-close:hover { background: #172033; }
-
-.htlc-form {
+.htlc-row {
   display: grid;
+  grid-template-columns: 140px 1fr auto;
+  align-items: center;
   gap: 10px;
 }
 
-.htlc-actions-row {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-}
-
-.muted {
-  color: #9ca3af;
-  font-size: 13px;
-}
-
-/* Log console */
 .htlc-console {
   background: #0b1220;
   border: 1px solid #374151;

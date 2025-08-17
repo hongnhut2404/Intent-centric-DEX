@@ -50,7 +50,7 @@ export default function App() {
       case 'Intents':
         return <IntentList />;
 
-        case 'Matches':
+      case 'Matches':
         return <MatchedList />;
 
       case 'HTLC':
