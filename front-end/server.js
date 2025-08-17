@@ -2,7 +2,6 @@
 import express from 'express';
 import compression from 'compression';
 import cors from 'cors';
-import fs from "fs";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -81,47 +80,6 @@ app.get('/api/htlc/view', async (_req, res) => {
     res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
   }
 });
-
-// POST /api/htlc/withdraw
-app.post('/api/htlc/withdraw', async (req, res) => {
-  try {
-    const { buyId } = req.body ?? {};
-    const env = { ...process.env };
-    if (buyId !== undefined && buyId !== null) env.BUY_ID = String(buyId);
-
-    const { out, err } = await runNode(
-      'npx',
-      ['hardhat', 'run', 'localhost-script/htlc/withdrawHTLC.js', '--network', 'localhost'],
-      { env }
-    );
-
-    res.json({ ok: true, out, err });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
-  }
-});
-
-const BTC_STATE_PATH = path.join(
-  process.cwd(),
-  "bitcoin-chain",
-  "data-script",
-  "keys-state.json"        // <- whatever your stateFile is
-);
-
-app.get("/api/btc/state", (_req, res) => {
-  try {
-    if (!fs.existsSync(BTC_STATE_PATH)) {
-      return res.json({ ok: true, alice: null, bob: null });
-    }
-    const raw = fs.readFileSync(BTC_STATE_PATH, "utf8");
-    const data = JSON.parse(raw);
-    res.json({ ok: true, alice: data?.Alice ?? null, bob: data?.Bob ?? null });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
-
 
 // Optional: 404 for unknown /api routes
 app.use('/api', (_req, res) => {
