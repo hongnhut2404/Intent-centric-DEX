@@ -1,167 +1,198 @@
+// bitcoin-chain/src/fund/main.go
 package main
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"net/http"
 	"os"
-	"os/exec"
-
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcutil"
-	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/joho/godotenv"
+	"path/filepath"
+	"time"
 )
 
-func loadEnv() {
-	paths := []string{"../../.env", "../.env", "./.env", "../../../.env"}
-	for _, path := range paths {
-		if err := godotenv.Load(path); err == nil {
-			return
-		}
-	}
-	log.Fatal("Error loading .env from any known location")
+// ---------- Config ----------
+const (
+	rpcUser = "admin"
+	rpcPass = "HouiWGc9wyj_2Fx2G9FYnQAr3AIXEeb-uRNRNITgKso"
+	rpcURL  = "http://127.0.0.1:8332"
+
+	// relative to this file's working dir (server runs this with cwd: bitcoin-chain/src/fund)
+	dataDir = "../../../data-script"
+)
+
+// ---------- Types ----------
+type rpcReq struct {
+	Jsonrpc string        `json:"jsonrpc"`
+	ID      string        `json:"id"`
+	Method  string        `json:"method"`
+	Params  []interface{} `json:"params"`
+}
+type rpcResp struct {
+	Result json.RawMessage `json:"result"`
+	Error  *rpcError       `json:"error"`
+	ID     string          `json:"id"`
+}
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
-func ReadInput(filePath string) (map[string]interface{}, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open file: %w", err)
-	}
-	defer file.Close()
-
-	bytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read file: %w", err)
-	}
-
-	var data map[string]interface{}
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
-		return nil, fmt.Errorf("invalid JSON format: %w", err)
-	}
-
-	return data, nil
+type PaymentMessage struct {
+	BTCAmount float64 `json:"btc_amount"`
+	// other fields not needed here
 }
 
-func broadcastViaBitcoinCli(rawHex string) error {
-	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", rawHex)
-	output, err := cmd.CombinedOutput()
+type HTLCContract struct {
+	P2SHAddress  string `json:"address"`
+	RedeemScript string `json:"redeem_script"`
+	// other fields optional (secret_hash, locktime, etc.)
+}
+
+// ---------- RPC helper ----------
+func callRPC(method string, params []interface{}, out any) error {
+	body, _ := json.Marshal(rpcReq{
+		Jsonrpc: "1.0",
+		ID:      "fund",
+		Method:  method,
+		Params:  params,
+	})
+
+	req, err := http.NewRequest("POST", rpcURL, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("bitcoin-cli failed: %v\n%s", err, string(output))
+		return err
 	}
-	fmt.Println("Broadcast successful! TXID:", string(output))
+	req.SetBasicAuth(rpcUser, rpcPass)
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := &http.Client{Timeout: 30 * time.Second}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var rr rpcResp
+	if err := json.NewDecoder(resp.Body).Decode(&rr); err != nil {
+		return err
+	}
+	if rr.Error != nil {
+		return fmt.Errorf("rpc error %d: %s", rr.Error.Code, rr.Error.Message)
+	}
+	if out != nil {
+		return json.Unmarshal(rr.Result, out)
+	}
 	return nil
 }
 
-func FundHTLC() error {
-	loadEnv()
-
-	// Load HTLC address
-	htlcFile := os.Getenv("ADDRESS_TEST")
-	if htlcFile == "" {
-		return fmt.Errorf("ADDRESS_TEST is not set in .env")
-	}
-	htlcRaw, err := ioutil.ReadFile(htlcFile)
+// ---------- IO helpers ----------
+func readPaymentAmount() (float64, error) {
+	f := filepath.Join(dataDir, "payment_message.json")
+	fp, err := os.Open(f)
 	if err != nil {
-		return fmt.Errorf("failed to read address-test.json: %v", err)
+		return 0, fmt.Errorf("open payment_message.json: %w", err)
 	}
-	var htlcData map[string]interface{}
-	if err := json.Unmarshal(htlcRaw, &htlcData); err != nil {
-		return fmt.Errorf("invalid JSON in address-test.json: %v", err)
-	}
-	htlc := htlcData["HTLC"].([]interface{})[0].(map[string]interface{})
-	htlcAddr := htlc["address"].(string)
+	defer fp.Close()
 
-	// Load UTXO
-	utxoFile := os.Getenv("UTXO_JSON")
-	if utxoFile == "" {
-		return fmt.Errorf("UTXO_JSON is not set in .env")
+	var msg PaymentMessage
+	if err := json.NewDecoder(fp).Decode(&msg); err != nil {
+		return 0, fmt.Errorf("decode payment_message.json: %w", err)
 	}
-	utxoRaw, err := ioutil.ReadFile(utxoFile)
-	if err != nil {
-		return fmt.Errorf("failed to read utxo.json: %v", err)
+	if msg.BTCAmount <= 0 {
+		return 0, errors.New("btc_amount must be > 0 in payment_message.json")
 	}
-	var utxo map[string]interface{}
-	if err := json.Unmarshal(utxoRaw, &utxo); err != nil {
-		return fmt.Errorf("invalid JSON in utxo.json: %v", err)
-	}
-	first := utxo["unspents"].([]interface{})[0].(map[string]interface{})
-	txidStr := first["txid"].(string)
-	vout := int(first["vout"].(float64))
-	utxoAmount := btcutil.Amount(first["amount"].(float64) * 1e8)
-	scriptPubKeyHex := first["scriptPubKey"].(string)
-
-	// Load BTC amount from message
-	msgPath := os.Getenv("PAYMENT_MESSAGE_HTLC")
-	if msgPath == "" {
-		return fmt.Errorf("PAYMENT_MESSAGE is not set in .env")
-	}
-	msg, err := ReadInput(msgPath)
-	if err != nil {
-		return fmt.Errorf("failed to read payment_message.json: %v", err)
-	}
-	btcAmount := btcutil.Amount(msg["btc_amount"].(float64) * 1e8)
-	fee := btcutil.Amount(500)
-
-	if utxoAmount < btcAmount+fee {
-		return fmt.Errorf("UTXO amount (%d) < required (btc: %d + fee: %d)", utxoAmount, btcAmount, fee)
-	}
-
-	// Load Bob’s key
-	statePath := os.Getenv("STATE_PATH_HTLC")
-	state, err := ReadInput(statePath)
-	if err != nil {
-		return fmt.Errorf("failed to read state.json: %v", err)
-	}
-	bob := state["bob"].(map[string]interface{})
-	privHex := bob["privkey"].(string)
-	privBytes, _ := hex.DecodeString(privHex)
-	privKey, _ := btcec.PrivKeyFromBytes(privBytes)
-	bobAddr, _ := btcutil.DecodeAddress(bob["address"].(string), &chaincfg.RegressionNetParams)
-	bobScript, _ := txscript.PayToAddrScript(bobAddr)
-
-	// Create transaction
-	tx := wire.NewMsgTx(wire.TxVersion)
-	txHash, _ := chainhash.NewHashFromStr(txidStr)
-	tx.AddTxIn(wire.NewTxIn(wire.NewOutPoint(txHash, uint32(vout)), nil, nil))
-
-	// Output 1: HTLC
-	htlcObj, _ := btcutil.DecodeAddress(htlcAddr, &chaincfg.RegressionNetParams)
-	htlcScript, _ := txscript.PayToAddrScript(htlcObj)
-	tx.AddTxOut(wire.NewTxOut(int64(btcAmount), htlcScript))
-
-	// Output 2: Change
-	change := utxoAmount - btcAmount - fee
-	if change > 0 {
-		tx.AddTxOut(wire.NewTxOut(int64(change), bobScript))
-	}
-
-	// Sign input
-	scriptPubKey, _ := hex.DecodeString(scriptPubKeyHex)
-	sigScript, err := txscript.SignatureScript(tx, 0, scriptPubKey, txscript.SigHashAll, privKey, true)
-	if err != nil {
-		return fmt.Errorf("failed to sign tx: %v", err)
-	}
-	tx.TxIn[0].SignatureScript = sigScript
-
-	// Encode and broadcast
-	var buf bytes.Buffer
-	tx.Serialize(&buf)
-	rawTxHex := hex.EncodeToString(buf.Bytes())
-	fmt.Println("Broadcasting Raw Transaction...")
-
-	return broadcastViaBitcoinCli(rawTxHex)
+	return msg.BTCAmount, nil
 }
 
-func main() {
-	if err := FundHTLC(); err != nil {
-		log.Fatalf("Error: %v", err)
+func readHTLC() (*HTLCContract, error) {
+	f := filepath.Join(dataDir, "address-test.json") // <-- we read address-test.json
+	b, err := os.ReadFile(f)
+	if err != nil {
+		return nil, fmt.Errorf("open address-test.json: %w", err)
 	}
+
+	// 1) Try the array schema: { "HTLC": [ { "address": "...", "redeemScript": "..." } ] }
+	var outer struct {
+		HTLC []map[string]any `json:"HTLC"`
+	}
+	if err := json.Unmarshal(b, &outer); err == nil && len(outer.HTLC) > 0 {
+		first := outer.HTLC[0]
+		addr, _ := first["address"].(string)
+
+		// camelCase in your file -> normalize to snake case field
+		var redeem string
+		if v, ok := first["redeemScript"].(string); ok && v != "" {
+			redeem = v
+		} else if v, ok := first["redeem_script"].(string); ok && v != "" {
+			redeem = v
+		}
+
+		if addr != "" && redeem != "" {
+			return &HTLCContract{P2SHAddress: addr, RedeemScript: redeem}, nil
+		}
+		// fall through to try direct flat decode
+	}
+
+	// 2) Try flat object schema
+	var flat map[string]any
+	if err := json.Unmarshal(b, &flat); err == nil {
+		addr, _ := flat["address"].(string)
+		// allow both keys
+		redeem, _ := flat["redeem_script"].(string)
+		if redeem == "" {
+			if v, ok := flat["redeemScript"].(string); ok {
+				redeem = v
+			}
+		}
+		if addr != "" && redeem != "" {
+			return &HTLCContract{P2SHAddress: addr, RedeemScript: redeem}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("address-test.json does not contain a recognizable HTLC record")
+}
+
+// ---------- main ----------
+func main() {
+	fmt.Println("Funding HTLC (regtest)...")
+
+	amount, err := readPaymentAmount()
+	if err != nil {
+		fmt.Println("Fatal:", err)
+		os.Exit(1)
+	}
+	htlc, err := readHTLC()
+	if err != nil {
+		fmt.Println("Fatal:", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Destination: %s\n", htlc.P2SHAddress)
+	fmt.Printf("Amount     : %.8f BTC\n", amount)
+
+	// Use wallet RPC: sendtoaddress <address> <amount> "" "" subtractfeefromamount=true
+	var txid string
+	err = callRPC("sendtoaddress", []interface{}{htlc.P2SHAddress, amount, "", "", true}, &txid)
+	if err != nil {
+		fmt.Println("sendtoaddress failed:", err)
+		os.Exit(1)
+	}
+	fmt.Println("Broadcast txid:", txid)
+
+	// Optional: mine blocks to confirm (regtest only)
+	// get a fresh address to mine to, then generatetoaddress 1
+	var minerAddr string
+	if err := callRPC("getnewaddress", []interface{}{}, &minerAddr); err == nil && minerAddr != "" {
+		var mined []string
+		if err := callRPC("generatetoaddress", []interface{}{1, minerAddr}, &mined); err == nil {
+			fmt.Println("Mined 1 block for confirmation:", mined)
+		} else {
+			fmt.Println("Skip mining:", err)
+		}
+	} else {
+		fmt.Println("No mining address; skip mining:", err)
+	}
+
+	fmt.Println("HTLC funding complete.")
 }

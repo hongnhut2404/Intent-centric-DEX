@@ -1,0 +1,11 @@
+/* index.css - global styles */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #171B29; /* your theme bg */
+  color: white;
+}
+
+button {
+  cursor: pointer;
+}

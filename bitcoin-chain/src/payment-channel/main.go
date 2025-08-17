@@ -113,7 +113,7 @@ func main() {
 		var exchangeData struct {
 			Success bool `json:"success"`
 			HTLCs   []struct {
-				Secret    string  `json:"secret"`
+				Secret    string  `json:"secretBase"`
 				BtcAmount float64 `json:"btcAmount"`
 			} `json:"htlcs"`
 		}

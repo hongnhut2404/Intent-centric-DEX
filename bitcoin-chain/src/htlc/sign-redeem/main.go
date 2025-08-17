@@ -116,11 +116,11 @@ func readSecretPreimage() (string, error) {
 		return "", fmt.Errorf("invalid structure in 'htlcs[0]'")
 	}
 
-	secret, ok := firstHTLC["secret"].(string)
+	secret, ok := firstHTLC["secretBase"].(string)
 	if !ok || len(secret) == 0 {
 		return "", fmt.Errorf("missing or invalid 'secret' field in htlcs[0]")
 	}
-
+	fmt.Printf(secret)
 	return secret, nil
 }
 

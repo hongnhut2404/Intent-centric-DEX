@@ -1,0 +1,57 @@
+/* src/components/BitcoinPanel/BitcoinPanel.css */
+.btc-panel { background:#0f172a; color:#e5e7eb; border:1px solid #1f2937; border-radius:16px; padding:16px; }
+.btc-identity { opacity:.9; margin-bottom:12px; }
+.btc-actions { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+.btc-console { background:#0b1220; border:1px solid #374151; border-radius:12px; padding:12px; min-height:220px; white-space:pre-wrap; }
+.btc-console-actions { margin-top:8px; }
+.dex-swap-button.subtle { background:#1f2937; border:1px solid #374151; }
+.dex-swap-button.subtle:hover { background:#111827; }
+
+/* src/components/BitcoinPanel/BitcoinPanel.css */
+.btc-card { background:#0f172a; border:1px solid #1f2937; border-radius:12px; padding:12px; margin-bottom:12px; }
+.btc-card-title { margin:0 0 8px; }
+.btc-mini { opacity:.9; margin-bottom:8px; }
+.btc-error { color:#fca5a5; margin:8px 0; }
+.btc-balance-summary { margin:8px 0 12px; }
+.btc-table { width:100%; border-collapse: collapse; }
+.btc-table th, .btc-table td { border-bottom:1px solid #1f2937; padding:8px; text-align:left; }
+.btc-table .mono { font-family: ui-monospace, Menlo, monospace; }
+
+/* src/components/BitcoinPanel/BitcoinPanel.css */
+.btc-panel { max-width: 960px; margin: 0 auto; }
+.btc-identity { margin: 6px 0 12px; opacity: .9; }
+.btc-hint { opacity: .75; margin: 6px 0; }
+
+.btc-card { background:#0f172a; border:1px solid #1f2937; border-radius:12px; padding:12px; margin-bottom:12px; }
+.btc-card-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.btc-card-title { margin:0; }
+.btc-card-actions { display:flex; gap:8px; align-items:center; }
+
+.btc-form-grid {
+  display:grid;
+  grid-template-columns: 160px 1fr;
+  gap:10px;
+  align-items:center;
+  margin: 8px 0 12px;
+}
+.btc-form-grid input {
+  background:#0b1220; border:1px solid #374151; border-radius:8px; padding:8px; color:#e5e7eb;
+}
+
+.btc-console { background:#0b1220; border:1px solid #374151; border-radius:12px; padding:12px; min-height:160px; white-space:pre-wrap; line-height:1.35; }
+
+.btc-console {
+  background: #111827;   /* dark bg for readability */
+  color: #e5e7eb;        /* light text */
+  padding: 10px;
+  border-radius: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+
+  /* 🔑 enable wrapping */
+  white-space: pre-wrap;   /* preserve whitespace but allow wrapping */
+  word-wrap: break-word;   /* break long strings */
+  overflow-wrap: anywhere; /* modern browsers: break anywhere if needed */
+  font-family: monospace;
+  font-size: 0.9rem;
+}
