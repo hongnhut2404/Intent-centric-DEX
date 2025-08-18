@@ -34,13 +34,6 @@ export default function AppEth() {
         onConnectClick={handleConnectClick}
       />
 
-      <div className="status-bar">
-        <span><strong>Role:</strong> {ethRole ?? '—'}</span>
-        <span><strong>User:</strong> {short(userAddress)}</span>
-        <span><strong>MM:</strong> {short(mmAddress)}</span>
-        <span style={{ opacity: 0.8 }}>Local RPC: 127.0.0.1:8545</span>
-      </div>
-
       <main className="dex-main">
         {activeTab === 'Swap' && <SwapCard role={ethRole === 'MM' ? 'mm' : 'user'} />}
         {activeTab === 'Intents' && <IntentList />}

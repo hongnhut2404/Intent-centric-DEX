@@ -108,7 +108,7 @@ export default function SwapCard({ role = 'user' }) {
         <input
           type="number"
           min="0"
-          step="0.00000001"
+          step="0.01"
           value={btcAmount}
           onChange={onChangeNum(setBtcAmount)}
           placeholder="0.0"
@@ -122,7 +122,7 @@ export default function SwapCard({ role = 'user' }) {
         <input
           type="number"
           min="0"
-          step="0.0001"
+          step="0.01"
           value={ethAmount}
           onChange={onChangeNum(setEthAmount)}
           placeholder="0.0"

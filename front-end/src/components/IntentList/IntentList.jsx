@@ -104,12 +104,6 @@ export default function IntentList() {
 
   return (
     <div className="intent-list">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <button onClick={loadIntents} className="dex-swap-button">Refresh</button>
-        {loading && <span style={{ color: '#9ca3af' }}>Loading…</span>}
-        {err && <span style={{ color: '#ef4444' }}>{err}</span>}
-      </div>
-
       <div className="intent-list-component">
         <h2>Buy Intents</h2>
         {loading ? (
@@ -172,6 +166,12 @@ export default function IntentList() {
             </tbody>
           </table>
         )}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <button onClick={loadIntents} className="dex-swap-button">Refresh</button>
+        {loading && <span style={{ color: '#9ca3af' }}>Loading…</span>}
+        {err && <span style={{ color: '#ef4444' }}>{err}</span>}
       </div>
     </div>
   );

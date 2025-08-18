@@ -87,12 +87,12 @@ export default function MatchedList() {
   useEffect(() => {
     const c = getContract();
     const onMatch = () => loadMatches();
-    try { c.on('TradeMatched', onMatch); } catch {}
-    return () => { try { c.off('TradeMatched', onMatch); } catch {} };
+    try { c.on('TradeMatched', onMatch); } catch { }
+    return () => { try { c.off('TradeMatched', onMatch); } catch { } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const short = (a) => (a ? `${a.slice(0,6)}…${a.slice(-4)}` : '—');
+  const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '—');
   const fmtTime = (sec) => new Date(sec * 1000).toLocaleString();
 
   const filtered = useMemo(() => {
@@ -108,21 +108,7 @@ export default function MatchedList() {
 
   return (
     <div className="matches">
-      <div className="matches-toolbar">
-        <button className="dex-swap-button" onClick={loadMatches}>Refresh</button>
 
-        <div className="matches-filter">
-          <label>Filter:</label>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All</option>
-            <option value="user">User (buyer = your user address)</option>
-            <option value="mm">MM (seller = your MM address)</option>
-          </select>
-        </div>
-
-        {err && <span className="matches-err">{err}</span>}
-        {loading && <span className="matches-loading">Loading…</span>}
-      </div>
 
       {filtered.length === 0 && !loading ? (
         <p className="matches-empty">No matched trades yet.</p>
@@ -158,6 +144,12 @@ export default function MatchedList() {
           </tbody>
         </table>
       )}
+      <div className="matches-toolbar">
+        <button className="dex-swap-button" onClick={loadMatches}>Refresh</button>
+
+        {err && <span className="matches-err">{err}</span>}
+        {loading && <span className="matches-loading">Loading…</span>}
+      </div>
     </div>
   );
 }

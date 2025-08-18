@@ -13,7 +13,7 @@ export default function AppBtc() {
       <header className="dex-header">
         <div className="dex-logo">IntentSwap — Bitcoin</div>
         <button className="dex-connect-button" onClick={() => setShowConnect(true)}>
-          {btcActor ? `${btcActor.roleLabel} • ${btcActor.who}` : "Connect"}
+          {btcActor ? `${btcActor.roleLabel}` : "Connect"}
         </button>
       </header>
 

@@ -38,15 +38,6 @@ export default function Header({
       <div className="dex-controls">
         <button
           type="button"
-          className="dex-switch-button"
-          onClick={onSwitch}
-          title="Switch chain"
-        >
-          {chain === 'eth' ? 'Switch to BTC' : 'Switch to ETH'}
-        </button>
-
-        <button
-          type="button"
           className="dex-connect-button"
           onClick={handleConnect}
           aria-pressed={connected ? 'true' : 'false'}

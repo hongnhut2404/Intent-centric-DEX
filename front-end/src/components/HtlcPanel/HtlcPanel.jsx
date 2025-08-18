@@ -71,33 +71,25 @@ export default function HtlcPanel() {
 
   return (
     <div className="htlc-panel">
-      <h2 className="dex-section-title">HTLC Ops (Solver)</h2>
-
       <div className="htlc-actions">
         <div className="htlc-row">
           <label>BUY_ID (optional)</label>
           <input
-            type="number"
-            min="0"
-            placeholder="0"
+            type="text"
             value={buyId}
             onChange={(e) => setBuyId(e.target.value)}
-            className="dex-token-amount"
-            disabled={busy}
+            placeholder="BUY_ID (optional)"
           />
         </div>
 
-        <div className="htlc-row buttons">
-          <button className="dex-swap-button" onClick={onFund} disabled={busy}>Fund Multisig → HTLC</button>
-          <button className="dex-swap-button" onClick={onCreate} disabled={busy}>Create HTLC(s)</button>
-          <button className="dex-swap-button" onClick={onView} disabled={busy}>View HTLCs</button>
-          <button className="dex-swap-button" onClick={onWithdraw} disabled={busy}>Withdraw HTLC(s)</button>
-          <button className="dex-swap-button" onClick={() => setShowSecretModal(true)} disabled={busy}>
-            Withdraw HTLC(s)
-          </button>
-
-          <button className="dex-swap-button subtle" onClick={onClear} disabled={busy}>Clear</button>
+        <div className="htlc-ops">
+          <button className="dex-swap-button" onClick={onFund}>Fund Multisig → HTLC</button>
+          <button className="dex-swap-button" onClick={onCreate}>Create HTLC(s)</button>
+          <button className="dex-swap-button" onClick={onView}>View HTLCs</button>
+          <button className="dex-swap-button" onClick={onWithdraw}>Withdraw HTLC(s)</button>
+          <button className="dex-swap-button" onClick={onClear}>Clear</button>
         </div>
+
       </div>
       // add modal near bottom of component:
       {showSecretModal && (
