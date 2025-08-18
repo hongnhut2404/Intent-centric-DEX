@@ -69,3 +69,19 @@
   color: #e5e7eb; 
   font-size: 20px;
 }
+
+.btc-console {
+  background-color: #111;
+  font-family: monospace;
+  font-size: 0.85rem;
+
+  height: 200px;        /* fixed height */
+  overflow-y: auto;     /* scroll instead of expand */
+  overflow-x: auto;     /* scroll horizontally if needed */
+  white-space: pre-wrap;
+  word-break: break-word;
+  width: 800px;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #444;
+}

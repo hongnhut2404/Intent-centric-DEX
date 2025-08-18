@@ -13,6 +13,7 @@
   font-size: 1rem;
 }
 
+
 .dex-token-input {
   margin-bottom: 20px;
   display: flex;
@@ -71,6 +72,9 @@
 
 .dex-response-msg {
   margin-top: 20px;
-  color: #4caf50;
+  color: #333;
   font-weight: bold;
+}
+.dex-swap-card .dex-section-title{
+  color: #333;
 }

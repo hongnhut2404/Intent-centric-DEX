@@ -80,8 +80,7 @@ export default function SwapCard({ role = 'user' }) {
         await tx.wait();
 
         setResponseMsg(
-          `✅ Sell Intent created! Sell ${ethAmount} ETH for min ${btcAmount} BTC` +
-          (rate ? ` (≈ ${rate} BTC/ETH)` : '') + `.`
+          `✅ Sell Intent created! Sell ${ethAmount} ETH for min ${btcAmount} BTC`
         );
       }
     } catch (err) {
