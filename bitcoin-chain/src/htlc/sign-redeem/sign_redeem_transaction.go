@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -20,6 +23,35 @@ type InputSignRedeemTransaction struct {
 	mySecret           string
 	receiverPrivKeyWif string
 	receiverPubKey     string
+}
+
+const dataDir = "../../../data-script"
+const signedRedeemJSONPath = dataDir + "/signed_redeem.json"
+
+func SaveSignedRedeemMsgTx(tx *wire.MsgTx, txid string) error {
+	var buf bytes.Buffer
+	if err := tx.Serialize(&buf); err != nil {
+		return fmt.Errorf("serialize tx: %w", err)
+	}
+	rawHex := hex.EncodeToString(buf.Bytes())
+	if txid == "" {
+		txid = tx.TxHash().String()
+	}
+
+	out := map[string]string{
+		"txid": txid,
+		"raw":  rawHex,
+	}
+
+	if err := os.MkdirAll(filepath.Dir(signedRedeemJSONPath), 0o755); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	b, _ := json.MarshalIndent(out, "", "  ")
+	if err := os.WriteFile(signedRedeemJSONPath, b, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", signedRedeemJSONPath, err)
+	}
+	fmt.Println("Saved signed redeem tx to", signedRedeemJSONPath)
+	return nil
 }
 
 func decodeTx(txHex string) (*wire.MsgTx, error) {
@@ -125,14 +157,26 @@ func signTransaction(input InputSignRedeemTransaction, netParams *chaincfg.Param
 		return "", fmt.Errorf("error serializing transaction: %v", err)
 	}
 
-	fmt.Printf("Hex transaction: %s\n", hex.EncodeToString(signedTx.Bytes()))
-	// Broadcast using bitcoin-cli sendrawtransaction
-	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", hex.EncodeToString(signedTx.Bytes()))
+	var ser bytes.Buffer
+	if err := input.tx.Serialize(&ser); err != nil {
+		return "", fmt.Errorf("error serializing transaction: %v", err)
+	}
+	hexRaw := hex.EncodeToString(ser.Bytes())
+	fmt.Printf("Hex transaction: %s\n", hexRaw)
+
+	// Broadcast with bitcoin-cli
+	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", hexRaw)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to broadcast transaction: %v\n%s", err, output)
 	}
-	fmt.Printf("Transaction broadcasted successfully. TXID: %s\n", output)
+	txid := string(bytes.TrimSpace(output))
+	fmt.Printf("Transaction broadcasted successfully. TXID: %s\n", txid)
+
+	// Persist both txid and raw for the reveal step
+	if err := SaveSignedRedeemMsgTx(input.tx, txid); err != nil {
+		return "", fmt.Errorf("save signed_redeem.json: %w", err)
+	}
 
 	return hex.EncodeToString(signedTx.Bytes()), nil
 }

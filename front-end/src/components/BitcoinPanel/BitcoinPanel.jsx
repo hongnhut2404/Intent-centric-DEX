@@ -20,9 +20,9 @@ export default function BitcoinPanel({ btcIdentity }) {
   const role = btcIdentity?.who;           // 'alice' or 'bob'
   const addr = btcIdentity?.address || '';
   const isSolver = role === 'alice';       // Solver = Alice
-  const isUser   = role === 'bob';         // User = Bob
+  const isUser = role === 'bob';         // User = Bob
 
-  const short = (a) => (a ? `${a.slice(0,10)}…${a.slice(-8)}` : '—');
+  const short = (a) => (a ? `${a.slice(0, 10)}…${a.slice(-8)}` : '—');
 
   function append(s) { setLog((old) => (old ? `${old}\n${s}` : s)); }
 
@@ -30,7 +30,7 @@ export default function BitcoinPanel({ btcIdentity }) {
     setBusy(true);
     append(`\n▶ ${path}`);
     try {
-      const res  = await fetch(`${API}${path}`, { headers: { 'Content-Type':'application/json' }, ...opts });
+      const res = await fetch(`${API}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
       const text = await res.text();
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}\n${text}`);
       append(text || '(no output)');
@@ -43,16 +43,16 @@ export default function BitcoinPanel({ btcIdentity }) {
 
   // ---- Actions ----
   // Both roles
-  const onBalance      = async () => {
+  const onBalance = async () => {
     if (!addr) return;
     setBalBusy(true); setBalErr('');
     try {
-      const res  = await fetch(`${API}/balance`, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ address: addr }) });
+      const res = await fetch(`${API}/balance`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address: addr }) });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setTotalBTC(Number(data.total));
       setUtxos(Array.isArray(data.utxos) ? data.utxos : []);
-      append(`\nBalance: ${Number(data.total).toFixed(8)} BTC (${(data.utxos||[]).length} UTXO)`);
+      append(`\nBalance: ${Number(data.total).toFixed(8)} BTC (${(data.utxos || []).length} UTXO)`);
     } catch (e) {
       setBalErr(e.message); setTotalBTC(null); setUtxos([]);
       append(`ERROR: ${e.message}`);
@@ -60,48 +60,20 @@ export default function BitcoinPanel({ btcIdentity }) {
   };
 
   // Solver (Alice)
-  const onGenerate     = () => callTXT('/generate',      { method:'POST' }); // reads env if you set BTC_PM_SECRET/BTC_PM_AMOUNT
-  const onCreateRedeem = () => callTXT('/create-redeem', { method:'POST' });
-  const onSignRedeem   = () => callTXT('/sign-redeem',   { method:'POST' });
-  const onScan         = () => callTXT('/scan',          { method:'POST' });  // optional
+  const onGenerate = () => callTXT('/generate', { method: 'POST' }); // reads env if you set BTC_PM_SECRET/BTC_PM_AMOUNT
+  const onCreateRedeem = () => callTXT('/create-redeem', { method: 'POST' });
+  const onSignRedeem = () => callTXT('/sign-redeem', { method: 'POST' });
+  const onScan = () => callTXT('/scan', { method: 'POST' });  // optional
 
   // NEW: Reveal preimage from broadcast tx (Solver)
-  const onRevealPreimage = async () => {
-    setBusy(true);
-    append(`\n▶ /reveal-preimage`);
-    try {
-      const res = await fetch(`${API}/reveal-preimage`, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok || data.ok === false) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      // Console output (stdout/stderr)
-      const out = (data.out || '').trim();
-      const err = (data.err || '').trim();
-      append([out, err && `[stderr]\n${err}`].filter(Boolean).join('\n') || '(no output)');
+  // Solver (Alice) actions
+  const onRevealPreimage = () => callTXT('/reveal-preimage', { method: 'POST' });
 
-      // Secret
-      if (data.secret) {
-        setRevealedSecret(data.secret);
-        setRevealedHex(data.hex || null);
-        append(`Secret extracted: ${data.secret}`);
-      } else {
-        append('No secret found in result.');
-      }
-    } catch (e) {
-      append(`ERROR: ${e.message}`);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   // User (Bob)
-  const onVerifyOpRet  = () => callTXT('/verify-opreturn', { method:'POST' });
-  const onCreateHtlc   = () => callTXT('/create-htlc',     { method:'POST' });
-  const onFundHtlc     = () => callTXT('/fund',            { method:'POST' });
+  const onVerifyOpRet = () => callTXT('/verify-opreturn', { method: 'POST' });
+  const onCreateHtlc = () => callTXT('/create-htlc', { method: 'POST' });
+  const onFundHtlc = () => callTXT('/fund', { method: 'POST' });
 
   // Clear balance when identity changes
   useEffect(() => { setTotalBTC(null); setUtxos([]); setBalErr(''); }, [addr]);
@@ -144,7 +116,7 @@ export default function BitcoinPanel({ btcIdentity }) {
                   <tr><th>TXID</th><th>Vout</th><th>Amount (BTC)</th><th>Height</th></tr>
                 </thead>
                 <tbody>
-                  {utxos.map((u,i) => (
+                  {utxos.map((u, i) => (
                     <tr key={`${u.txid}-${u.vout}-${i}`}>
                       <td className="mono break" title={u.txid}>{short(u.txid)}</td>
                       <td>{u.vout}</td>
@@ -168,16 +140,16 @@ export default function BitcoinPanel({ btcIdentity }) {
                 <>
                   <button className="dex-swap-button" onClick={onVerifyOpRet} disabled={busy}>Verify OP_RETURN</button>
                   <button className="dex-swap-button" onClick={onCreateHtlc} disabled={busy}>Create HTLC</button>
-                  <button className="dex-swap-button" onClick={onFundHtlc}   disabled={busy}>Fund HTLC</button>
-                  <button className="dex-swap-button" onClick={onRevealPreimage}  disabled={busy}>Reveal Secret (from BTC tx)</button>
-                  <button className="dex-swap-button subtle" onClick={onScan}  disabled={busy}>Scan HTLC (optional)</button>
+                  <button className="dex-swap-button" onClick={onFundHtlc} disabled={busy}>Fund HTLC</button>
+                  <button className="dex-swap-button" onClick={onRevealPreimage} disabled={busy}>Reveal Secret (from BTC tx)</button>
+                  <button className="dex-swap-button subtle" onClick={onScan} disabled={busy}>Scan HTLC (optional)</button>
                 </>
               ) : (
                 <>
-                  <button className="dex-swap-button" onClick={onGenerate}        disabled={busy}>Generate Message</button>
-                  <button className="dex-swap-button" onClick={onCreateRedeem}    disabled={busy}>Create Redeem Tx</button>
-                  <button className="dex-swap-button" onClick={onSignRedeem}      disabled={busy}>Sign Redeem Tx & Broadcast</button>
-                  <button className="dex-swap-button subtle" onClick={onScan}     disabled={busy}>Scan HTLC (optional)</button>
+                  <button className="dex-swap-button" onClick={onGenerate} disabled={busy}>Generate Message</button>
+                  <button className="dex-swap-button" onClick={onCreateRedeem} disabled={busy}>Create Redeem Tx</button>
+                  <button className="dex-swap-button" onClick={onSignRedeem} disabled={busy}>Sign Redeem Tx & Broadcast</button>
+                  <button className="dex-swap-button subtle" onClick={onScan} disabled={busy}>Scan HTLC (optional)</button>
                 </>
               )}
             </div>

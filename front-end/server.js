@@ -265,25 +265,24 @@ app.post('/api/btc/sign-redeem', async (_req, res) => {
 });
 
 // --- reveal preimage from signed tx ---
+// POST /api/btc/reveal-preimage
+// Body (optional): { txid?: string, raw?: string }
+// server.js
 app.post('/api/btc/reveal-preimage', async (_req, res) => {
   try {
+    // if your tool is in bitcoin-chain/src/htlc/sign-redeem-new
     const r = await runGo('src/htlc/reveal-preimage', ['run', '.']);
-
-    // Attempt to load the saved file
-    const outPath = path.join(BTC_ROOT, 'data-script', 'revealed_secret.json');
-    let secret = null, hex = null;
-    if (fs.existsSync(outPath)) {
-      const j = JSON.parse(fs.readFileSync(outPath, 'utf8'));
-      secret = j.secret ?? null;
-      hex = j.hex ?? null;
-    }
-
-    res.json({ ok: true, out: r.out, err: r.err, secret, hex });
+    // r.out should include lines like:
+    // Secret (utf-8): ...
+    // Secret (hex)  : ...
+    // sha256(secret): ...
+    // Saved: ../../../data-script/revealed_secret.json
+    res.type('text/plain').send(r.out + (r.err ? `\n[stderr]\n${r.err}` : ''));
   } catch (e) {
-    // If the Go run failed, try to surface stdout/stderr text too
-    res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
+    res.status(500).type('text/plain').send(e.out || e.err || e.message);
   }
 });
+
 
 
 // -------------------- 404 for /api/* --------------------
