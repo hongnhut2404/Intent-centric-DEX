@@ -1,17 +1,24 @@
 // scripts/htlc/withdrawHTLC.js
-
 const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  const buyIntentId = parseInt(process.env.BUY_ID || "0");
+  const buyIntentId = parseInt(process.env.BUY_ID || "0", 10);
+  const secret = (process.env.SECRET || "").trim();
+
+  if (!secret) {
+    throw new Error(
+      "SECRET env is required. Example:\n" +
+      "  SECRET=mysecret BUY_ID=1 npx hardhat run scripts/htlc/withdrawHTLC.js --network localhost"
+    );
+  }
 
   const allSigners = await hre.ethers.getSigners();
 
   // Load deployed addresses
   const { address: intentMatchingAddress } = JSON.parse(
-    fs.readFileSync("data/intent-matching-address.json", "utf8")
+    fs.readFileSync(path.resolve(__dirname, "../../data/intent-matching-address.json"), "utf8")
   );
 
   const IntentMatching = await hre.ethers.getContractFactory("IntentMatching");
@@ -24,15 +31,19 @@ async function main() {
   const multisigAddress = await intentMatching.multisigWallet();
   const multisig = await MultisigWallet.attach(multisigAddress);
 
+  // Build the set of available local multisig owners
   const owners = await multisig.getOwners();
   const localSigners = owners
-    .map((addr) => allSigners.find((s) => s.address.toLowerCase() === addr.toLowerCase()))
+    .map((addr) =>
+      allSigners.find((s) => s.address.toLowerCase() === addr.toLowerCase())
+    )
     .filter(Boolean);
 
   if (localSigners.length < owners.length) {
     console.warn("Warning: Some multisig owners are not available locally.");
   }
 
+  // Find HTLCs associated to this BuyIntent
   const filter = intentMatching.filters.HTLCAssociated(buyIntentId);
   const events = await intentMatching.queryFilter(filter);
 
@@ -41,56 +52,43 @@ async function main() {
     return;
   }
 
-  async function fetchSecret(lockId) {
-    const eventFilter = htlc.filters.SecretRevealed(lockId);
-    const revealedEvents = await htlc.queryFilter(eventFilter);
-    if (revealedEvents.length === 0) {
-      throw new Error(`Secret not yet revealed for lockId: ${lockId}`);
-    }
-    return revealedEvents[0].args.secret;
-  }
-
   let successCount = 0;
 
   for (const event of events) {
     const { lockId, recipient } = event.args;
-
     console.log(`\nWithdrawing HTLC: lockId=${lockId}, recipient=${recipient}`);
 
-    let secret;
-    try {
-      secret = await fetchSecret(lockId);
-    } catch (err) {
-      console.warn(`Skipping withdrawal for lockId ${lockId}: ${err.message}`);
-      continue;
-    }
-
-    const balanceBefore = await hre.ethers.provider.getBalance(recipient);
+    // Prepare call data for HTLC.withdraw(lockId, bytes secret)
     const calldata = htlc.interface.encodeFunctionData("withdraw", [
       lockId,
       hre.ethers.toUtf8Bytes(secret),
     ]);
 
     try {
-      const submitTx = await multisig.connect(localSigners[0]).submitTransaction(htlcAddress, 0, calldata);
+      // 1) submit
+      const submitTx = await multisig
+        .connect(localSigners[0])
+        .submitTransaction(htlcAddress, 0, calldata);
       await submitTx.wait();
       const txID = (await multisig.txCounter()) - 1n;
 
+      // 2) confirm by all local owners we have
       for (const signer of localSigners) {
         try {
           const tx = await multisig.connect(signer).confirmTransaction(txID);
           await tx.wait();
           console.log(`Tx ${txID} confirmed by ${signer.address}`);
         } catch (err) {
-          if (!err.message.includes("Already confirmed")) {
+          if (!String(err.message).includes("Already confirmed")) {
             console.warn(`Confirm by ${signer.address} failed: ${err.message}`);
           }
         }
       }
 
+      // 3) execute
+      const balanceBefore = await hre.ethers.provider.getBalance(recipient);
       const execTx = await multisig.connect(localSigners[0]).executeTransaction(txID);
       await execTx.wait();
-
       const balanceAfter = await hre.ethers.provider.getBalance(recipient);
       const delta = balanceAfter - balanceBefore;
 
@@ -104,7 +102,9 @@ async function main() {
     }
   }
 
-  console.log(`\nSummary: Successfully withdrew ${successCount} HTLC(s) for BuyIntent ${buyIntentId}`);
+  console.log(
+    `\nSummary: Successfully withdrew ${successCount} HTLC(s) for BuyIntent ${buyIntentId}`
+  );
 }
 
 main().catch((err) => {

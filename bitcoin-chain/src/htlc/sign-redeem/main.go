@@ -101,27 +101,31 @@ func readSecretPreimage() (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("EXCHANGE_DATA_HTLC not set in .env")
 	}
-	data, err := ReadInput(path)
+
+	data, err := ReadInput(path) // map[string]interface{}
 	if err != nil {
 		return "", err
 	}
 
+	// 1) Preferred: top-level baseSecret
+	if v, ok := data["baseSecret"].(string); ok && v != "" {
+		return v, nil
+	}
+
+	// 2) Fallback: htlcs[0].secretBase
 	htlcs, ok := data["htlcs"].([]interface{})
 	if !ok || len(htlcs) == 0 {
-		return "", fmt.Errorf("missing or invalid 'htlcs' field")
+		return "", fmt.Errorf("missing 'baseSecret' and no 'htlcs' entries in %s", path)
 	}
-
-	firstHTLC, ok := htlcs[0].(map[string]interface{})
+	first, ok := htlcs[0].(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("invalid structure in 'htlcs[0]'")
+		return "", fmt.Errorf("invalid structure for 'htlcs[0]' in %s", path)
+	}
+	if v, ok := first["secretBase"].(string); ok && v != "" {
+		return v, nil
 	}
 
-	secret, ok := firstHTLC["secretBase"].(string)
-	if !ok || len(secret) == 0 {
-		return "", fmt.Errorf("missing or invalid 'secret' field in htlcs[0]")
-	}
-	fmt.Printf(secret)
-	return secret, nil
+	return "", fmt.Errorf("could not find base secret (checked 'baseSecret' and 'htlcs[0].secretBase') in %s", path)
 }
 
 // === Main ===

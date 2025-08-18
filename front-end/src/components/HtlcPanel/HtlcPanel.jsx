@@ -9,6 +9,8 @@ export default function HtlcPanel() {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState("");
   const consoleRef = useRef(null);
+  const [showSecretModal, setShowSecretModal] = useState(false);
+  const [secretInput, setSecretInput] = useState("");
 
   useEffect(() => {
     // auto-scroll console
@@ -16,6 +18,10 @@ export default function HtlcPanel() {
       consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
     }
   }, [log]);
+
+  // HtlcPanel.jsx (only the relevant changes)
+
+
 
   function append(line) {
     setLog((l) => (l ? `${l}\n${line}` : line));
@@ -50,11 +56,18 @@ export default function HtlcPanel() {
     return Number.isFinite(n) && n >= 0 ? { buyId: n } : {};
   }, [buyId]);
 
-  const onFund     = () => call("/fund",     { method: "POST" });
-  const onCreate   = () => call("/create",   { method: "POST", body: JSON.stringify(bodyFromBuyId) });
-  const onView     = () => call("/view",     { method: "GET" });
-  const onWithdraw = () => call("/withdraw", { method: "POST", body: JSON.stringify(bodyFromBuyId) });
-  const onClear    = () => setLog("");
+  const onFund = () => call("/fund", { method: "POST" });
+  const onCreate = () => call("/create", { method: "POST", body: JSON.stringify(bodyFromBuyId) });
+  const onView = () => call("/view", { method: "GET" });
+  const onWithdraw = async () => {
+    // Ask the user for the secret preimage
+    const s = window.prompt("Enter the secret preimage (ASCII/UTF-8):");
+    if (s == null || s.trim() === "") return; // cancelled or empty
+
+    const payload = { ...bodyFromBuyId, secret: s.trim() };
+    call("/withdraw", { method: "POST", body: JSON.stringify(payload) });
+  };
+  const onClear = () => setLog("");
 
   return (
     <div className="htlc-panel">
@@ -79,9 +92,43 @@ export default function HtlcPanel() {
           <button className="dex-swap-button" onClick={onCreate} disabled={busy}>Create HTLC(s)</button>
           <button className="dex-swap-button" onClick={onView} disabled={busy}>View HTLCs</button>
           <button className="dex-swap-button" onClick={onWithdraw} disabled={busy}>Withdraw HTLC(s)</button>
+          <button className="dex-swap-button" onClick={() => setShowSecretModal(true)} disabled={busy}>
+            Withdraw HTLC(s)
+          </button>
+
           <button className="dex-swap-button subtle" onClick={onClear} disabled={busy}>Clear</button>
         </div>
       </div>
+      // add modal near bottom of component:
+      {showSecretModal && (
+        <div className="htlc-modal-overlay" onClick={() => !busy && setShowSecretModal(false)}>
+          <div className="htlc-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="htlc-modal-header">
+              <h3>Withdraw HTLC(s)</h3>
+              <button className="htlc-close" onClick={() => setShowSecretModal(false)} disabled={busy}>×</button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const payload = { ...bodyFromBuyId, secret: secretInput.trim() };
+              setShowSecretModal(false);
+              call("/withdraw", { method: "POST", body: JSON.stringify(payload) });
+            }} className="htlc-form">
+              <label>Secret preimage</label>
+              <input
+                type="text"
+                placeholder="e.g. s--zyyrZYvligBGb"
+                value={secretInput}
+                onChange={(e) => setSecretInput(e.target.value)}
+                className="dex-token-amount"
+                required
+              />
+              <div className="htlc-actions-row">
+                <button className="dex-swap-button" type="submit" disabled={busy}>Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <pre ref={consoleRef} className="htlc-console">
         {log || "Console output will appear here…"}

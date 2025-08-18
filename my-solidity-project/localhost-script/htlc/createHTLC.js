@@ -4,9 +4,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-// --- helpers ---
+// ---------- helpers ----------
 function getBuyIdOrDefault() {
-  // priority: env -> argv[2] -> 0
   const envId = process.env.BUY_ID;
   if (envId !== undefined && envId !== "") {
     const n = parseInt(envId, 10);
@@ -19,21 +18,74 @@ function getBuyIdOrDefault() {
   return 0;
 }
 
-function generateRandomSecret(len = 12) {
-  const bytes = crypto.randomBytes(len);
-  // base64-url-ish (no +/), or just hex if you prefer
-  return bytes.toString("base64url");
+function generateRandomSecret(len = 16) {
+  // URL-safe base64 to keep it printable, you can switch to hex if you prefer
+  return crypto.randomBytes(len).toString("base64url");
 }
 
 function bn(x) {
   return typeof x === "bigint" ? x : BigInt(x.toString());
 }
 
+function readJsonSafe(p) {
+  try {
+    if (fs.existsSync(p)) {
+      return JSON.parse(fs.readFileSync(p, "utf8"));
+    }
+  } catch {}
+  return null;
+}
+
+function ensureDir(p) {
+  const d = path.dirname(p);
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+}
+
+function writeJson(p, obj) {
+  ensureDir(p);
+  fs.writeFileSync(p, JSON.stringify(obj, null, 2));
+  console.log(`HTLC metadata saved to: ${p}`);
+}
+
+// Try to load a previously used baseSecret for this buyId
+function loadOrCreateBaseSecret(buyId, existing) {
+  // existing format: { success, buyIntentId, baseSecret, htlcs: [...] }  (new format)
+  if (existing && existing.buyIntentId === buyId && typeof existing.baseSecret === "string" && existing.baseSecret.length > 0) {
+    return existing.baseSecret;
+  }
+  // Backward-compat with your old format (an array of htlcs each with secretBase),
+  // if you ever wrote it like that—try to recover from first entry:
+  if (existing && Array.isArray(existing.htlcs) && existing.htlcs.length > 0) {
+    const s = existing.htlcs[0].secretBase;
+    if (typeof s === "string" && s.length > 0) return s;
+  }
+  // else generate a new one
+  return generateRandomSecret(16);
+}
+
+// ---------- main ----------
 async function main() {
   const buyIntentId = getBuyIdOrDefault();
   console.log(`Using BUY_ID = ${buyIntentId}`);
 
-  // --- wire up contracts/addresses ---
+  // File paths (both ecosystems)
+  const outPaths = [
+    path.resolve(__dirname, "../../../bitcoin-chain/data-script/exchange-data.json"),
+    path.resolve(__dirname, "../../data/exchange-data.json"),
+  ];
+
+  // If we already have a file, try to reuse secret for the same buyId
+  const existing = readJsonSafe(outPaths[1]) || readJsonSafe(outPaths[0]);
+  const baseSecret = loadOrCreateBaseSecret(buyIntentId, existing);
+  const baseKeccak = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(baseSecret));
+  const baseSha256 = crypto.createHash("sha256").update(baseSecret).digest("hex");
+
+  console.log("Shared Base Secret:", baseSecret);
+  console.log("Base Keccak (ETH):", baseKeccak);
+  console.log("Base SHA256  (BTC):", baseSha256);
+  console.log("(Same secret/hash will be used for every HTLC under this BUY_ID)");
+
+  // --- wire up contracts ---
   const allSigners = await hre.ethers.getSigners();
 
   const intentJsonPath = path.resolve(__dirname, "../../data/intent-matching-address.json");
@@ -89,10 +141,13 @@ async function main() {
 
   if (trades.length === 0) {
     console.log(`No matched trades for BUY_ID=${buyIntentId}`);
+    // Still persist a stub with the baseSecret so it can be reused later
+    const stub = { success: true, buyIntentId, baseSecret, htlcs: [] };
+    outPaths.forEach(p => writeJson(p, stub));
     return;
   }
 
-  // skip zero-ETH partials and pre-sum ETH needed
+  // filter zero-ETH and sum
   let totalEthNeeded = 0n;
   const usable = [];
   for (const { idx, t } of trades) {
@@ -106,40 +161,32 @@ async function main() {
 
   if (usable.length === 0) {
     console.log("All matched trades have 0 ETH (likely rounding). Nothing to lock.");
+    const stub = { success: true, buyIntentId, baseSecret, htlcs: [] };
+    outPaths.forEach(p => writeJson(p, stub));
     return;
   }
 
-  // --- pre-check multisig balance ---
+  // --- check multisig balance ---
   const msigBal = await hre.ethers.provider.getBalance(multisigAddress);
   if (msigBal < totalEthNeeded) {
     console.warn(`⚠️ Multisig balance ${hre.ethers.formatEther(msigBal)} ETH < needed ${hre.ethers.formatEther(totalEthNeeded)} ETH`);
     console.warn("Proceeding best-effort (some locks may fail). Consider funding the multisig first.");
   }
 
-  // --- base secret, then derive per-trade salt/hashes ---
-  const baseSecret = generateRandomSecret(12);
-  const baseKeccak = hre.ethers.keccak256(hre.ethers.toUtf8Bytes(baseSecret));
-
   const htlcMetadata = [];
   let created = 0;
   let associated = 0;
 
-  console.log(`\nWill attempt HTLCs for ${usable.length} trade(s).`);
+  console.log(`\nWill attempt HTLCs for ${usable.length} trade(s) with ONE shared hash.`);
 
   for (const { idx, t } of usable) {
-    // per-trade salted hashes (avoid duplicate-lock reverts)
-    const perTradeKeccak = hre.ethers.keccak256(
-      hre.ethers.solidityPacked(["bytes32", "uint256"], [baseKeccak, idx])
-    );
-    const perTradeSha256 = crypto
-      .createHash("sha256")
-      .update(`${baseSecret}#${idx.toString()}`)
-      .digest("hex");
+    // 👇 Use the SAME hash for every HTLC in this BUY_ID
+    const secretHashKeccak = baseKeccak;
 
     // 1) submit newLock (value = ethAmount)
     const calldata = htlc.interface.encodeFunctionData("newLock", [
       t.recipient,
-      perTradeKeccak,
+      secretHashKeccak,
       t.locktime,
     ]);
 
@@ -162,11 +209,7 @@ async function main() {
 
     // 2) confirm threshold
     for (let j = 0; j < Number(threshold); j++) {
-      try {
-        await multisig.connect(localOwners[j]).confirmTransaction(txID);
-      } catch (err) {
-        // often "Already confirmed"; safe to ignore
-      }
+      try { await multisig.connect(localOwners[j]).confirmTransaction(txID); } catch {}
     }
 
     // 3) execute
@@ -176,8 +219,7 @@ async function main() {
       execReceipt = await execTx.wait();
       created++;
     } catch (err) {
-      console.error(`❌ Execute newLock failed for trade #${idx}, txID ${txID}:`,
-        err?.error?.error?.message || err?.message || err);
+      console.error(`❌ Execute newLock failed for trade #${idx}, txID ${txID}:`, err?.error?.error?.message || err?.message || err);
       continue;
     }
 
@@ -198,7 +240,7 @@ async function main() {
       buyIntentId,
       lockId,
       t.recipient,
-      perTradeKeccak,
+      secretHashKeccak, // same hash we locked with
     ]);
 
     let assocTxID;
@@ -218,9 +260,7 @@ async function main() {
     }
 
     for (let j = 0; j < Number(threshold); j++) {
-      try {
-        await multisig.connect(localOwners[j]).confirmTransaction(assocTxID);
-      } catch {}
+      try { await multisig.connect(localOwners[j]).confirmTransaction(assocTxID); } catch {}
     }
 
     try {
@@ -231,14 +271,13 @@ async function main() {
       console.error(`❌ Execute associateHTLC failed for trade #${idx}:`, err?.error?.error?.message || err?.message || err);
     }
 
-    // 6) export data for BTC side
+    // 6) export data for BTC + future ETH withdraw UI
     htlcMetadata.push({
       lockId: lockId.toString(),
       locktime: Number(t.locktime),
-      // keep the baseSecret; BTC side uses per-trade salted SHA-256 below
-      secretBase: baseSecret,
-      secretHashKeccak: perTradeKeccak,
-      secretHashSha256: perTradeSha256,
+      // Keep record of the shared secret & hashes for clarity / BTC side linking
+      secretHashKeccak: secretHashKeccak,
+      secretHashSha256: baseSha256,
       ethAmount: Number(hre.ethers.formatEther(t.ethAmount)),
       btcAmount: Number((Number(t.btcAmount) / 1e8).toFixed(8)),
       recipient: t.recipient,
@@ -249,22 +288,20 @@ async function main() {
   console.log(`${created} HTLC(s) locked on-chain for BuyIntent ${buyIntentId}`);
   console.log(`${associated} HTLC association(s) recorded`);
   if (created > 0) {
-    console.log("Shared Base Secret:", baseSecret);
-    console.log("Base Keccak (ETH):", baseKeccak);
-    console.log("Per-trade salts: keccak(base || idx) / sha256(base + '#' + idx)");
+    console.log("One shared secret used across all HTLCs for this BUY_ID.");
   }
 
-  // --- persist metadata (both locations) ---
-  const outputs = [
-    path.resolve(__dirname, "../../../bitcoin-chain/data-script/exchange-data.json"),
-    path.resolve(__dirname, "../../data/exchange-data.json"),
-  ];
-  for (const outPath of outputs) {
-    const dir = path.dirname(outPath);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(outPath, JSON.stringify({ success: true, buyIntentId, htlcs: htlcMetadata }, null, 2));
-    console.log(`HTLC metadata saved to: ${outPath}`);
-  }
+  // --- persist in the new single-secret format ---
+  const outObj = {
+    success: true,
+    buyIntentId,
+    baseSecret,          // 👈 persist the shared secret
+    baseKeccak,
+    baseSha256,
+    htlcs: htlcMetadata, // list of HTLCs created for this buyId
+  };
+
+  outPaths.forEach(p => writeJson(p, outObj));
 }
 
 main().catch((err) => {

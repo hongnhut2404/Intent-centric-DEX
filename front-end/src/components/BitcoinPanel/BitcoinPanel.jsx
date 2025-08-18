@@ -7,6 +7,9 @@ const API = '/api/btc';
 export default function BitcoinPanel({ btcIdentity }) {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState('');
+  const [secret, setSecret] = useState("");
+  const [revealedSecret, setRevealedSecret] = useState(null);
+  const [revealedHex, setRevealedHex] = useState(null);
 
   // Balance state
   const [balBusy, setBalBusy] = useState(false);
@@ -62,6 +65,39 @@ export default function BitcoinPanel({ btcIdentity }) {
   const onSignRedeem   = () => callTXT('/sign-redeem',   { method:'POST' });
   const onScan         = () => callTXT('/scan',          { method:'POST' });  // optional
 
+  // NEW: Reveal preimage from broadcast tx (Solver)
+  const onRevealPreimage = async () => {
+    setBusy(true);
+    append(`\n▶ /reveal-preimage`);
+    try {
+      const res = await fetch(`${API}/reveal-preimage`, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      // Console output (stdout/stderr)
+      const out = (data.out || '').trim();
+      const err = (data.err || '').trim();
+      append([out, err && `[stderr]\n${err}`].filter(Boolean).join('\n') || '(no output)');
+
+      // Secret
+      if (data.secret) {
+        setRevealedSecret(data.secret);
+        setRevealedHex(data.hex || null);
+        append(`Secret extracted: ${data.secret}`);
+      } else {
+        append('No secret found in result.');
+      }
+    } catch (e) {
+      append(`ERROR: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   // User (Bob)
   const onVerifyOpRet  = () => callTXT('/verify-opreturn', { method:'POST' });
   const onCreateHtlc   = () => callTXT('/create-htlc',     { method:'POST' });
@@ -110,7 +146,7 @@ export default function BitcoinPanel({ btcIdentity }) {
                 <tbody>
                   {utxos.map((u,i) => (
                     <tr key={`${u.txid}-${u.vout}-${i}`}>
-                      <td className="mono" title={u.txid}>{short(u.txid)}</td>
+                      <td className="mono break" title={u.txid}>{short(u.txid)}</td>
                       <td>{u.vout}</td>
                       <td>{Number(u.amount).toFixed(8)}</td>
                       <td>{u.height ?? '—'}</td>
@@ -133,16 +169,48 @@ export default function BitcoinPanel({ btcIdentity }) {
                   <button className="dex-swap-button" onClick={onVerifyOpRet} disabled={busy}>Verify OP_RETURN</button>
                   <button className="dex-swap-button" onClick={onCreateHtlc} disabled={busy}>Create HTLC</button>
                   <button className="dex-swap-button" onClick={onFundHtlc}   disabled={busy}>Fund HTLC</button>
+                  <button className="dex-swap-button" onClick={onRevealPreimage}  disabled={busy}>Reveal Secret (from BTC tx)</button>
+                  <button className="dex-swap-button subtle" onClick={onScan}  disabled={busy}>Scan HTLC (optional)</button>
                 </>
               ) : (
                 <>
-                  <button className="dex-swap-button" onClick={onGenerate}     disabled={busy}>Generate Message</button>
-                  <button className="dex-swap-button" onClick={onCreateRedeem} disabled={busy}>Create Redeem Tx</button>
-                  <button className="dex-swap-button" onClick={onSignRedeem}   disabled={busy}>Sign Redeem Tx</button>
-                  <button className="dex-swap-button subtle" onClick={onScan}  disabled={busy}>Scan HTLC (optional)</button>
+                  <button className="dex-swap-button" onClick={onGenerate}        disabled={busy}>Generate Message</button>
+                  <button className="dex-swap-button" onClick={onCreateRedeem}    disabled={busy}>Create Redeem Tx</button>
+                  <button className="dex-swap-button" onClick={onSignRedeem}      disabled={busy}>Sign Redeem Tx & Broadcast</button>
+                  <button className="dex-swap-button subtle" onClick={onScan}     disabled={busy}>Scan HTLC (optional)</button>
                 </>
               )}
             </div>
+
+            {/* Show revealed secret once available */}
+            {revealedSecret && (
+              <div className="btc-secret">
+                <div><strong>Revealed Secret (utf-8):</strong></div>
+                <code className="mono break">{revealedSecret}</code>
+                {revealedHex && (
+                  <>
+                    <div style={{ marginTop: 8 }}><strong>Secret (hex):</strong></div>
+                    <code className="mono break">{revealedHex}</code>
+                  </>
+                )}
+                <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+                  <button
+                    className="dex-swap-button subtle"
+                    onClick={() => navigator.clipboard.writeText(revealedSecret)}
+                  >
+                    Copy UTF-8
+                  </button>
+                  {revealedHex && (
+                    <button
+                      className="dex-swap-button subtle"
+                      onClick={() => navigator.clipboard.writeText(revealedHex)}
+                    >
+                      Copy Hex
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Console */}

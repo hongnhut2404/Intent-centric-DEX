@@ -125,6 +125,7 @@ func signTransaction(input InputSignRedeemTransaction, netParams *chaincfg.Param
 		return "", fmt.Errorf("error serializing transaction: %v", err)
 	}
 
+	fmt.Printf("Hex transaction: %s\n", hex.EncodeToString(signedTx.Bytes()))
 	// Broadcast using bitcoin-cli sendrawtransaction
 	cmd := exec.Command("bitcoin-cli", "sendrawtransaction", hex.EncodeToString(signedTx.Bytes()))
 	output, err := cmd.CombinedOutput()

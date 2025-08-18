@@ -104,44 +104,60 @@ func main() {
 			return
 		}
 
-		exchangeDataRaw, err := os.ReadFile(exchangePath)
+		raw, err := os.ReadFile(exchangePath)
 		if err != nil {
 			fmt.Println("Failed to read exchange-data.json:", err)
 			return
 		}
 
-		var exchangeData struct {
-			Success bool `json:"success"`
-			HTLCs   []struct {
-				Secret    string  `json:"secretBase"`
-				BtcAmount float64 `json:"btcAmount"`
+		// New schema with back-compat to old field names
+		var exchange struct {
+			Success    bool   `json:"success"`
+			BuyIntent  int    `json:"buyIntentId"`
+			BaseSecret string `json:"baseSecret"` // NEW (preferred)
+			HTLCs      []struct {
+				// legacy name kept for back-compat; not used if BaseSecret present
+				SecretBase string  `json:"secretBase,omitempty"`
+				BtcAmount  float64 `json:"btcAmount"`
 			} `json:"htlcs"`
 		}
 
-		if err := json.Unmarshal(exchangeDataRaw, &exchangeData); err != nil {
+		if err := json.Unmarshal(raw, &exchange); err != nil {
 			fmt.Println("Invalid JSON in exchange-data.json:", err)
 			return
 		}
-		if len(exchangeData.HTLCs) == 0 {
+		if len(exchange.HTLCs) == 0 {
 			fmt.Println("No HTLCs found in exchange data")
 			return
 		}
 
-		// Get the shared secret (assumed same for all HTLCs)
-		secret := exchangeData.HTLCs[0].Secret
+		// Resolve the shared secret (prefer new top-level baseSecret)
+		secret := exchange.BaseSecret
+		if secret == "" && exchange.HTLCs[0].SecretBase != "" { // fallback to legacy location
+			secret = exchange.HTLCs[0].SecretBase
+		}
+		if secret == "" {
+			fmt.Println("No shared secret found (expected top-level baseSecret or htlcs[0].secretBase)")
+			return
+		}
 
-		// Sum up all BTC amounts
+		// Sum all BTC amounts
 		var totalBTC float64
-		for _, htlc := range exchangeData.HTLCs {
-			totalBTC += htlc.BtcAmount
+		for _, h := range exchange.HTLCs {
+			totalBTC += h.BtcAmount
+		}
+		if totalBTC <= 0 {
+			fmt.Println("Total BTC amount is zero or negative")
+			return
 		}
 
 		btcAmountStr := fmt.Sprintf("%.8f", totalBTC)
 
-		err = scripts.GeneratePaymentMessage(secret, btcAmountStr, paymentMessagePath, opreturnTxPath, statePath)
-		if err != nil {
+		if err := scripts.GeneratePaymentMessage(secret, btcAmountStr, paymentMessagePath, opreturnTxPath, statePath); err != nil {
 			fmt.Println("Generate error:", err)
+			return
 		}
+		fmt.Println("Payment message + OP_RETURN generated successfully")
 
 	case "verify-opreturn":
 		if len(os.Args) != 4 {

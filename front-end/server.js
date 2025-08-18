@@ -65,14 +65,29 @@ app.get('/api/htlc/view', async (_req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err }); }
 });
 
+// server.js excerpt
+// server.js
 app.post('/api/htlc/withdraw', async (req, res) => {
   try {
+    const { buyId, secret } = req.body ?? {};
     const env = { ...process.env };
-    if (req.body?.buyId != null) env.BUY_ID = String(req.body.buyId);
-    const { out, err } = await runNode('npx', ['hardhat', 'run', 'localhost-script/htlc/withdrawHTLC.js', '--network', 'localhost'], { env });
+    if (buyId !== undefined && buyId !== null) env.BUY_ID = String(buyId);
+    if (secret) env.SECRET = String(secret);
+
+    const { out, err } = await runNode(
+      'npx',
+      // USE THE CORRECT PATH YOU ARE USING LOCALLY:
+      ['hardhat', 'run', 'localhost-script/htlc/withdrawHTLC.js', '--network', 'localhost'],
+      { env }
+    );
+
     res.json({ ok: true, out, err });
-  } catch (e) { res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err }); }
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
+  }
 });
+
+
 
 /* =========================================
  * BTC integration (Go + bitcoind RPC)
@@ -241,11 +256,32 @@ app.post('/api/btc/create-redeem', async (_req, res) => {
 app.post('/api/btc/sign-redeem', async (_req, res) => {
   try {
     const r = await runGo('src/htlc/sign-redeem', ['run', '.']);
-    const j = path.join(BTC_ROOT, 'data-script', 'redeem_signed.json');
-    const payload = fs.existsSync(j) ? `\n${fs.readFileSync(j,'utf8')}` : '';
-    res.type('text/plain').send(r.out + (r.err ? `\n[stderr]\n${r.err}` : '') + payload);
+    const outPath = path.join(BTC_ROOT, 'data-script', 'btc_reveal.json');
+    const extra = fs.existsSync(outPath) ? `\n${fs.readFileSync(outPath, 'utf8')}` : '';
+    res.type('text/plain').send(r.out + (r.err ? `\n[stderr]\n${r.err}` : '') + extra);
   } catch (e) {
     res.status(500).type('text/plain').send(e.out || e.err || e.message);
+  }
+});
+
+// --- reveal preimage from signed tx ---
+app.post('/api/btc/reveal-preimage', async (_req, res) => {
+  try {
+    const r = await runGo('src/htlc/reveal-preimage', ['run', '.']);
+
+    // Attempt to load the saved file
+    const outPath = path.join(BTC_ROOT, 'data-script', 'revealed_secret.json');
+    let secret = null, hex = null;
+    if (fs.existsSync(outPath)) {
+      const j = JSON.parse(fs.readFileSync(outPath, 'utf8'));
+      secret = j.secret ?? null;
+      hex = j.hex ?? null;
+    }
+
+    res.json({ ok: true, out: r.out, err: r.err, secret, hex });
+  } catch (e) {
+    // If the Go run failed, try to surface stdout/stderr text too
+    res.status(500).json({ ok: false, error: e.message, out: e.out, err: e.err });
   }
 });
 

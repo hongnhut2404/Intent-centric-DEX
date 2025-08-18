@@ -55,3 +55,8 @@
   font-family: monospace;
   font-size: 0.9rem;
 }
+
+/* in BitcoinPanel.css */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+.break { word-break: break-all; overflow-wrap: anywhere; }
+.btc-secret { margin-top: 12px; padding: 10px; background: #0f1420; border: 1px solid #1f2937; border-radius: 10px; }
